@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "DevSwing Manifest",
+  "description": "Configuration manifest for a DevSwing playground (codeswing.json).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "scripts": {
+      "type": "array",
+      "description": "List of script library URLs or cdnjs package names to inject before the swing's script.",
+      "items": { "type": "string" }
+    },
+    "styles": {
+      "type": "array",
+      "description": "List of stylesheet URLs or cdnjs package names to inject before the swing's styles.",
+      "items": { "type": "string" }
+    },
+    "layout": {
+      "type": "string",
+      "description": "Override the default editor layout for this swing.",
+      "enum": ["grid", "preview", "splitBottom", "splitLeft", "splitLeftTabbed", "splitRight", "splitRightTabbed", "splitTop"]
+    },
+    "showConsole": {
+      "type": "boolean",
+      "description": "Automatically show the console output panel when this swing opens."
+    },
+    "template": {
+      "type": "boolean",
+      "description": "Mark this swing as a template so it appears in the New Swing gallery."
+    },
+    "scriptType": {
+      "type": "string",
+      "description": "Force the script tag type for the swing's main script.",
+      "enum": ["text/javascript", "module"]
+    },
+    "readmeBehavior": {
+      "type": "string",
+      "description": "Control how the swing's README is displayed in the preview.",
+      "enum": ["none", "previewHeader", "previewFooter"]
+    },
+    "tutorial": {
+      "type": "string",
+      "description": "Title of the tutorial this swing belongs to."
+    },
+    "themePreview": {
+      "type": "boolean",
+      "description": "Apply the VS Code editor theme colors to the preview pane."
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of what this swing demonstrates."
+    },
+    "author": {
+      "type": "string",
+      "description": "Name or handle of the swing's author."
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords for categorising or filtering this swing.",
+      "items": { "type": "string" }
+    },
+    "input": {
+      "type": "object",
+      "description": "Tutorial input configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "fileName": {
+          "type": "string",
+          "description": "Name of the file the learner should edit."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Prompt text shown to the learner."
+        },
+        "completionMessage": {
+          "type": "string",
+          "description": "Message shown when the tutorial is completed."
+        }
+      }
+    }
+  }
+}

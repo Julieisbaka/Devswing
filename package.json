@@ -1,0 +1,497 @@
+{
+  "name": "devswing",
+  "displayName": "DevSwing",
+  "publisher": "JulieISBaka",
+  "description": "Interactive coding playground for building web applications (aka swings).",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lostintangent/codeswing"
+  },
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
+  "activationEvents": [
+    "workspaceContains:devswing.json",
+    "workspaceContains:codeswing.json",
+    "onFileSystem:vscode-vfs",
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "browser": "./dist/extension-web.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "devswing.addLibrary",
+        "title": "Add Library",
+        "category": "DevSwing",
+        "icon": "$(library)"
+      },
+      {
+        "command": "devswing.addSwingFile",
+        "title": "Add File",
+        "icon": "$(add)"
+      },
+      {
+        "command": "devswing.changeLayout",
+        "title": "Change Layout",
+        "category": "DevSwing",
+        "icon": "$(editor-layout)"
+      },
+      {
+        "command": "devswing.deleteSwingFile",
+        "title": "Delete File"
+      },
+      {
+        "command": "devswing.exportToCodePen",
+        "title": "Export to CodePen",
+        "category": "DevSwing"
+      },
+      {
+        "command": "devswing.exportToStackBlitz",
+        "title": "Export to StackBlitz",
+        "category": "DevSwing"
+      },
+      {
+        "command": "devswing.generateWithCopilot",
+        "title": "Generate Swing with Copilot",
+        "category": "DevSwing",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "devswing.initializeWorkspace",
+        "title": "Initialize Workspace as Swing",
+        "category": "DevSwing"
+      },
+      {
+        "command": "devswing.newSwingDirectory",
+        "title": "New Swing in Directory...",
+        "category": "DevSwing"
+      },
+      {
+        "command": "devswing.newSwing",
+        "title": "New Swing...",
+        "category": "DevSwing"
+      },
+      {
+        "command": "devswing.newSwingFromLastTemplate",
+        "title": "New Swing from Last Template",
+        "category": "DevSwing"
+      },
+      {
+        "command": "devswing.openConsole",
+        "title": "Open Console",
+        "category": "DevSwing",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "devswing.openDeveloperTools",
+        "title": "Open Dev Tools",
+        "category": "DevSwing",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "devswing.openSwing",
+        "title": "Open Swing...",
+        "category": "DevSwing"
+      },
+      {
+        "command": "devswing.openSwingInNewWindow",
+        "title": "Open Swing in New Window...",
+        "category": "DevSwing"
+      },
+      {
+        "command": "devswing.openWorkspaceSwing",
+        "title": "Re-Open Workspace Swing",
+        "category": "DevSwing"
+      },
+      {
+        "command": "devswing.recordCodeTour",
+        "title": "Record CodeTour",
+        "icon": "$(record)"
+      },
+      {
+        "command": "devswing.renameSwingFile",
+        "title": "Rename File"
+      },
+      {
+        "command": "devswing.run",
+        "title": "Run Swing",
+        "category": "DevSwing",
+        "icon": "$(play)"
+      },
+      {
+        "command": "devswing.refineWithCopilot",
+        "title": "Refine with Copilot",
+        "category": "DevSwing",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "devswing.saveCurrentSwing",
+        "title": "Save Current Swing As...",
+        "category": "DevSwing"
+      },
+      {
+        "command": "devswing.uploadSwingFile",
+        "title": "Upload File(s)",
+        "icon": "$(cloud-upload)"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "devswing.activeSwing",
+          "name": "DevSwing",
+          "icon": "images/icon.png",
+          "when": "devswing:inSwing && !devswing:inSwingWorkspace"
+        }
+      ]
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "devswing.addLibrary",
+          "when": "devswing:inSwing"
+        },
+        {
+          "command": "devswing.changeLayout",
+          "when": "devswing:inSwing"
+        },
+        {
+          "command": "devswing.exportToCodePen",
+          "when": "devswing:inSwing"
+        },
+        {
+          "command": "devswing.exportToStackBlitz",
+          "when": "devswing:inSwing"
+        },
+        {
+          "command": "devswing.generateWithCopilot",
+          "when": "!devswing:inSwing"
+        },
+        {
+          "command": "devswing.initializeWorkspace",
+          "when": "!devswing:inSwingWorkspace && !devswing:inSwing"
+        },
+        {
+          "command": "devswing.openConsole",
+          "when": "devswing:inSwing"
+        },
+        {
+          "command": "devswing.newSwingFromLastTemplate",
+          "when": "devswing:hasTemplateMRU"
+        },
+        {
+          "command": "devswing.openDeveloperTools",
+          "when": "devswing:inSwing && !isWeb"
+        },
+        {
+          "command": "devswing.openWorkspaceSwing",
+          "when": "devswing:inSwingWorkspace && !devswing:inSwing"
+        },
+        {
+          "command": "devswing.run",
+          "when": "devswing:inSwing"
+        },
+        {
+          "command": "devswing.refineWithCopilot",
+          "when": "devswing:inSwing"
+        },
+        {
+          "command": "devswing.saveCurrentSwing",
+          "when": "devswing:inSwing"
+        },
+        {
+          "command": "devswing.addSwingFile",
+          "when": "false"
+        },
+        {
+          "command": "devswing.deleteSwingFile",
+          "when": "false"
+        },
+        {
+          "command": "devswing.recordCodeTour",
+          "when": "false"
+        },
+        {
+          "command": "devswing.renameSwingFile",
+          "when": "false"
+        },
+        {
+          "command": "devswing.uploadSwingFile",
+          "when": "false"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "devswing.refineWithCopilot",
+          "when": "devswing:inSwing",
+          "group": "navigation@1"
+        },
+        {
+          "command": "devswing.run",
+          "when": "devswing:inSwing",
+          "group": "navigation@2"
+        },
+        {
+          "command": "devswing.openConsole",
+          "when": "devswing:inSwing",
+          "group": "navigation@3"
+        },
+        {
+          "command": "devswing.changeLayout",
+          "when": "devswing:inSwing",
+          "group": "navigation@4"
+        },
+        {
+          "command": "devswing.addLibrary",
+          "when": "devswing:inSwing",
+          "group": "navigation@5"
+        },
+        {
+          "command": "devswing.openDeveloperTools",
+          "when": "devswing:inSwing && !isWeb",
+          "group": "navigation@6"
+        },
+        {
+          "command": "devswing.recordCodeTour",
+          "when": "devswing:inSwing && devswing:codeTourEnabled",
+          "group": "codetour@1"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "devswing.uploadSwingFile",
+          "when": "view == devswing.activeSwing",
+          "group": "navigation@1"
+        },
+        {
+          "command": "devswing.addSwingFile",
+          "when": "view == devswing.activeSwing",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "devswing.addSwingFile",
+          "when": "viewItem == swing.directory",
+          "group": "mutation@1"
+        },
+        {
+          "command": "devswing.uploadSwingFile",
+          "when": "viewItem == swing.directory",
+          "group": "mutation@2"
+        },
+        {
+          "command": "devswing.renameSwingFile",
+          "when": "viewItem == swing.file",
+          "group": "mutation@1"
+        },
+        {
+          "command": "devswing.deleteSwingFile",
+          "when": "viewItem == swing.file",
+          "group": "mutation@2"
+        }
+      ]
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": "devswing.json",
+        "url": "./schemas/codeswing.schema.json"
+      },
+      {
+        "fileMatch": "codeswing.json",
+        "url": "./schemas/codeswing.schema.json"
+      },
+      {
+        "fileMatch": "gallery.json",
+        "url": "./schemas/gallery.schema.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "DevSwing",
+      "properties": {
+        "devswing.autoRun": {
+          "default": "onEdit",
+          "enum": [
+            "onEdit",
+            "onSave",
+            "never"
+          ],
+          "description": "Specifies when to automatically run the code for a swing."
+        },
+        "devswing.autoSave": {
+          "default": false,
+          "type": "boolean",
+          "description": "Specifies whether to automatically save your swing files (every 30s)."
+        },
+        "devswing.clearConsoleOnRun": {
+          "default": true,
+          "type": "boolean",
+          "description": "Specifies whether to automatically clear the console when running a swing."
+        },
+        "devswing.launchBehavior": {
+          "default": "openSwing",
+          "enum": [
+            "newSwing",
+            "none",
+            "openSwing"
+          ],
+          "description": "Specifies how DevSwing should behave when you open a swing workspace."
+        },
+        "devswing.layout": {
+          "default": "splitLeft",
+          "enum": [
+            "grid",
+            "preview",
+            "splitBottom",
+            "splitLeft",
+            "splitLeftTabbed",
+            "splitRight",
+            "splitRightTabbed",
+            "splitTop"
+          ],
+          "description": "Specifies how to layout the editor windows when opening a swing."
+        },
+        "devswing.readmeBehavior": {
+          "default": "none",
+          "enum": [
+            "none",
+            "previewFooter",
+            "previewHeader"
+          ],
+          "description": "Specifies how the swing's readme content should be displayed."
+        },
+        "devswing.rootDirectory": {
+          "default": null,
+          "type": "string",
+          "description": "Specifies the directory to create swings in within the open workspace."
+        },
+        "devswing.showConsole": {
+          "default": false,
+          "type": "boolean",
+          "description": "Specifies whether to automatically show the console when opening a swing."
+        },
+        "devswing.templateGalleries": {
+          "default": [
+            "web:basic",
+            "web:components",
+            "web:languages"
+          ],
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "web:basic",
+                  "web:components",
+                  "web:languages"
+                ]
+              },
+              {
+                "type": "string",
+                "format": "uri"
+              }
+            ]
+          },
+          "description": "Specifies one or more URLs that point of template galleries for creating swings."
+        },
+        "devswing.themePreview": {
+          "default": false,
+          "type": "boolean",
+          "description": "Specifies whether to apply Visual Studio Code theme to the preview window."
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "typescriptreact",
+        "filenames": [
+          "script.babel"
+        ]
+      },
+      {
+        "id": "yaml",
+        "filenames": [
+          ".block"
+        ]
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "devswing.run",
+        "when": "devswing:inSwing",
+        "key": "cmd+shift+b",
+        "win": "ctrl+shift+b"
+      }
+    ],
+    "devswing.templateGalleries": [
+      {
+        "id": "web:basic",
+        "url": "https://cdn.jsdelivr.net/gh/lostintangent/codeswing@HEAD/templates/basic.json"
+      },
+      {
+        "id": "web:languages",
+        "url": "https://cdn.jsdelivr.net/gh/lostintangent/codeswing@HEAD/templates/languages.json"
+      },
+      {
+        "id": "web:components",
+        "url": "https://cdn.jsdelivr.net/gh/lostintangent/codeswing@main/templates/components.json"
+      },
+      {
+        "id": "go",
+        "url": "https://cdn.jsdelivr.net/gh/lostintangent/codeswing@main/templates/go.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "node --max-old-space-size=8192 node_modules/webpack/bin/webpack.js",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/debounce": "^1.2.0",
+    "@types/glob": "^7.1.3",
+    "@types/node": "^20.0.0",
+    "@types/sass": "^1.16.1",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vscode/vsce": "^3.0.0",
+    "eslint": "^8.57.1",
+    "glob": "^10.3.10",
+    "markdown-it": "^14.0.0",
+    "raw-loader": "^4.0.2",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.9.3",
+    "webpack": "^5.90.3",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "@vue/compiler-sfc": "^3.4.0",
+    "debounce": "^2.0.0",
+    "less": "^3.12.2",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
+    "postcss": "^8.2.6",
+    "pug": "^3.0.0",
+    "sass": "^1.32.7",
+    "sass.js": "^0.11.1",
+    "stream-browserify": "^3.0.0",
+    "svelte": "^4.1.2",
+    "vsls": "^1.0.3015",
+    "vue": "^3.4.0"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "DevSwing Template Gallery",
+  "description": "Defines a collection of templates that appear in the DevSwing New Swing gallery.",
+  "type": "object",
+  "required": ["id", "title", "templates"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the gallery (e.g. 'web:basic')."
+    },
+    "title": {
+      "type": "string",
+      "description": "Display name shown in the gallery picker."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description of this gallery."
+    },
+    "templates": {
+      "type": "array",
+      "description": "List of templates provided by this gallery.",
+      "items": {
+        "type": "object",
+        "required": ["title", "files"],
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Display name of the template."
+          },
+          "description": {
+            "type": "string",
+            "description": "Short description shown below the template name."
+          },
+          "files": {
+            "type": "array",
+            "description": "Files that make up the template.",
+            "items": {
+              "type": "object",
+              "required": ["filename"],
+              "additionalProperties": false,
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "description": "Name of the file (e.g. 'index.html', 'style.css')."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Initial content of the file."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
