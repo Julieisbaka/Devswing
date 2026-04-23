@@ -161,7 +161,7 @@ export async function refineSwingWithCopilot(
   const messages = [
     createUserMessage(systemPrompt),
     createUserMessage(
-      `Here are the current swing files:\n\n${currentContent}\n\nModify the swing based on the request below. Return only files that changed, with their complete updated content. No prose.\n\nREQUEST:\n${prompt}\n\nRESPONSE:`
+      `Here are the current swing files:\n\n${currentContent}\n\nModify the swing based on the request below. Preserve existing filenames and language choices unless the request explicitly asks to change them. In particular, if script.ts or script.tsx already exists, update that file and do not create script.js/script.jsx unless explicitly requested. Return only files that changed, with their complete updated content. No prose.\n\nREQUEST:\n${prompt}\n\nRESPONSE:`
     ),
   ];
   return sendRequest(messages);
