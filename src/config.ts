@@ -17,7 +17,7 @@ export function get(key: "templateGalleries"): string[];
 export function get(key: "themePreview"): boolean;
 export function get(key: "hotReloadDelay"): number;
 export function get(key: "aiSystemPrompt"): string;
-export function get(key: "aiModel"): "auto" | "gpt-4o" | "gpt-4-turbo" | "gpt-3.5-turbo";
+export function get(key: "aiModel"): string;
 export function get(key: any) {
   const extensionConfig = workspace.getConfiguration(EXTENSION_NAME);
   return extensionConfig.get(key);

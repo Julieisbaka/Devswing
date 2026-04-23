@@ -77,11 +77,11 @@ function createUserMessage(text: string): any {
 
 async function getCopilotModel(): Promise<any> {
   const modelPreference = config.get("aiModel");
-  
+
   const models = await (vscode as any).lm.selectChatModels({
     vendor: "copilot",
   });
-  
+
   if (models.length === 0) {
     throw new Error(
       "No GitHub Copilot language model is available. Make sure the GitHub Copilot extension is installed and you are signed in."
@@ -89,14 +89,27 @@ async function getCopilotModel(): Promise<any> {
   }
 
   // If auto or preference not specified, return the first (best) model
-  if (modelPreference === "auto" || !modelPreference) {
+  if (!modelPreference || modelPreference.trim() === "" || modelPreference === "auto") {
     return models[0];
   }
 
+  const preference = modelPreference.toLowerCase().trim();
+
   // Try to find a model matching the user's preference
-  const preferredModel = models.find((model: any) =>
-    model.id?.includes(modelPreference)
-  );
+  const preferredModel = models.find((model: any) => {
+    const id = String(model.id ?? "").toLowerCase();
+    const name = String(model.name ?? "").toLowerCase();
+    const family = String(model.family ?? "").toLowerCase();
+
+    return (
+      id === preference ||
+      name === preference ||
+      family === preference ||
+      id.includes(preference) ||
+      name.includes(preference) ||
+      family.includes(preference)
+    );
+  });
 
   if (preferredModel) {
     console.log(`Using preferred AI model: ${modelPreference}`);

@@ -170,6 +170,32 @@
           "filename": "style.scss"
         }
       ]
+    },
+    {
+      "title": "HTML + Angular (TypeScript)",
+      "files": [
+        {
+          "filename": "index.html",
+          "content": "<app-root></app-root>"
+        },
+        {
+          "filename": "app.component.ts",
+          "content": "import { Component } from '@angular/core';\n\n@Component({\n  selector: 'app-root',\n  template: `\n    <div style=\"text-align: center; padding: 2rem;\">\n      <h1>Hello {{ name }}!</h1>\n      <button (click)=\"name = 'Angular'\">Click me</button>\n    </div>\n  `\n})\nexport class AppComponent {\n  name = 'world';\n}"
+        }
+      ]
+    },
+    {
+      "title": "HTML + Angular Standalone",
+      "files": [
+        {
+          "filename": "index.html",
+          "content": "<app-root></app-root>"
+        },
+        {
+          "filename": "app.component.ts",
+          "content": "import { Component } from '@angular/core';\nimport { CommonModule } from '@angular/common';\nimport { FormsModule } from '@angular/forms';\n\n@Component({\n  selector: 'app-root',\n  standalone: true,\n  imports: [CommonModule, FormsModule],\n  template: `\n    <div style=\"text-align: center; padding: 2rem;\">\n      <h1>Hello {{ name }}!</h1>\n      <input [(ngModel)]=\"name\" placeholder=\"Enter name\" />\n    </div>\n  `\n})\nexport class AppComponent {\n  name = 'world';\n}"
+        }
+      ]
     }
   ]
 }

@@ -598,7 +598,21 @@ export async function openSwing(uri: Uri) {
           async (packages) => {
             try {
               const manifestContent = await vscode.workspace.fs.readFile(manifestUri);
-              const currentManifest = JSON.parse(byteArrayToString(manifestContent));
+              const manifestText = byteArrayToString(manifestContent).trim();
+              let currentManifest: SwingManifest;
+
+              try {
+                currentManifest = manifestText
+                  ? JSON.parse(manifestText)
+                  : { ...DEFAULT_MANIFEST };
+              } catch {
+                // If the file is temporarily invalid while being edited,
+                // fall back to the current in-memory manifest.
+                currentManifest = {
+                  ...DEFAULT_MANIFEST,
+                  ...manifest,
+                };
+              }
 
               currentManifest.scripts = [
                 ...(currentManifest.scripts || []),

@@ -431,13 +431,7 @@
         "devswing.aiModel": {
           "default": "auto",
           "type": "string",
-          "enum": [
-            "auto",
-            "gpt-4o",
-            "gpt-4-turbo",
-            "gpt-3.5-turbo"
-          ],
-          "description": "AI model to use for code generation. 'auto' will use the best available model from GitHub Copilot."
+          "description": "AI model to use for code generation. Use 'auto' or specify any available Copilot model id/name (for example: gpt-4o)."
         }
       }
     },
@@ -466,19 +460,19 @@
     "devswing.templateGalleries": [
       {
         "id": "web:basic",
-        "url": "https://cdn.jsdelivr.net/gh/lostintangent/codeswing@HEAD/templates/basic.json"
+        "url": "https://cdn.jsdelivr.net/gh/Julieisbaka/Devswing@main/templates/basic.json"
       },
       {
         "id": "web:languages",
-        "url": "https://cdn.jsdelivr.net/gh/lostintangent/codeswing@HEAD/templates/languages.json"
+        "url": "https://cdn.jsdelivr.net/gh/Julieisbaka/Devswing@main/templates/languages.json"
       },
       {
         "id": "web:components",
-        "url": "https://cdn.jsdelivr.net/gh/lostintangent/codeswing@main/templates/components.json"
+        "url": "https://cdn.jsdelivr.net/gh/Julieisbaka/Devswing@main/templates/components.json"
       },
       {
         "id": "go",
-        "url": "https://cdn.jsdelivr.net/gh/lostintangent/codeswing@main/templates/go.json"
+        "url": "https://cdn.jsdelivr.net/gh/Julieisbaka/Devswing@main/templates/go.json"
       }
     ]
   },
