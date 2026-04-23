@@ -1,3 +1,9 @@
+# Fork Changes
+
+- Forked from CodeSwing
+- Copyright (c) 2026 - JulieISBaka and Contributors
+- Updated branding and functionality for DevSwing
+
 # v0.0.25 (09/07/24)
 
 - Fixed some bugs with the latest version of VS Code
