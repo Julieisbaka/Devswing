@@ -1,3 +1,28 @@
+# v0.0.2 (04/23/26)
+
+- Added `DevSwing: New Swing in New Window...` command (`devswing.newSwingInNewWindow`).
+- Added configurable hot-reload debounce via `devswing.hotReloadDelay`.
+- Added AI settings:
+	- `devswing.aiSystemPrompt` for custom system prompts
+	- `devswing.aiModel` for model preference selection
+- Switched AI preamble loading to plain text (`src/ai/preamble.txt`) to avoid Markdown rendering issues.
+- Added Angular support improvements:
+	- New Angular component compiler module
+	- New Angular templates in template galleries
+- Added auto-detection of missing imported packages with prompt-to-add flow for manifest scripts.
+- Improved manifest change handling so JavaScript updates only occur when relevant manifest arrays change.
+- Improved HTTP bridge payload handling in preview webview (request/response body serialization for additional body types).
+- Added CDN fallback strategy for common module URLs:
+	- `vue` via unpkg ESM build
+	- `react`, `react-dom`, and `svelte` via esm.sh
+- Cleaned up codebase readability and consistency:
+	- Removed dead/commented legacy blocks
+	- Improved helper extraction in `src/preview/index.ts`
+	- Fixed naming and typo consistency across touched modules
+- Build and packaging compatibility fixes:
+	- Added missing dependencies (`case`, `mobx`, `squirrelly`, `twing`)
+	- Updated TypeScript config for compatibility (`DOM.Iterable`, removed invalid `ignoreDeprecations`)
+
 # Fork Changes
 
 - Forked from CodeSwing
