@@ -1,15 +1,24 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
+import * as config from "../config";
 import { SwingFile } from "../store";
 
 let SYSTEM_PROMPT: string | null = null;
 
-async function loadPreamble(): Promise<string> {
+async function loadSystemPrompt(): Promise<string> {
   if (SYSTEM_PROMPT) {
     return SYSTEM_PROMPT;
   }
 
+  // Check if user has configured a custom system prompt
+  const customPrompt = config.get("aiSystemPrompt");
+  if (customPrompt && customPrompt.trim()) {
+    SYSTEM_PROMPT = customPrompt;
+    return SYSTEM_PROMPT;
+  }
+
+  // Otherwise, load the default preamble
   try {
     const preamblePath = path.join(__dirname, "..", "ai", "preamble.md");
     const content = fs.readFileSync(preamblePath, "utf-8");
@@ -67,14 +76,37 @@ function createUserMessage(text: string): any {
 }
 
 async function getCopilotModel(): Promise<any> {
+  const modelPreference = config.get("aiModel");
+  
   const models = await (vscode as any).lm.selectChatModels({
     vendor: "copilot",
   });
+  
   if (models.length === 0) {
     throw new Error(
       "No GitHub Copilot language model is available. Make sure the GitHub Copilot extension is installed and you are signed in."
     );
   }
+
+  // If auto or preference not specified, return the first (best) model
+  if (modelPreference === "auto" || !modelPreference) {
+    return models[0];
+  }
+
+  // Try to find a model matching the user's preference
+  const preferredModel = models.find((model: any) =>
+    model.id?.includes(modelPreference)
+  );
+
+  if (preferredModel) {
+    console.log(`Using preferred AI model: ${modelPreference}`);
+    return preferredModel;
+  }
+
+  // Fall back to first model if preference not found
+  console.warn(
+    `Preferred model "${modelPreference}" not found. Using default model.`
+  );
   return models[0];
 }
 
@@ -96,7 +128,7 @@ async function sendRequest(
 }
 
 export async function generateSwingWithCopilot(prompt: string): Promise<SwingFile[]> {
-  const systemPrompt = await loadPreamble();
+  const systemPrompt = await loadSystemPrompt();
   const messages = [
     createUserMessage(systemPrompt),
     createUserMessage(`REQUEST:\n${prompt}\n\nRESPONSE:`),
@@ -108,7 +140,7 @@ export async function refineSwingWithCopilot(
   prompt: string,
   currentFiles: SwingFile[]
 ): Promise<SwingFile[]> {
-  const systemPrompt = await loadPreamble();
+  const systemPrompt = await loadSystemPrompt();
   const currentContent = currentFiles
     .map((f) => `<<—[${f.filename}]=\n${f.content ?? ""}\n—>>`)
     .join("\n\n");

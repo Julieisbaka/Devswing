@@ -417,6 +417,22 @@
           "minimum": 0,
           "maximum": 5000,
           "description": "Specifies the delay (in milliseconds) before updating the preview after code changes. Increase for better performance with large swings."
+        },
+        "devswing.aiSystemPrompt": {
+          "default": "",
+          "type": "string",
+          "description": "Custom system prompt for AI code generation. Leave empty to use the default preamble."
+        },
+        "devswing.aiModel": {
+          "default": "auto",
+          "type": "string",
+          "enum": [
+            "auto",
+            "gpt-4o",
+            "gpt-4-turbo",
+            "gpt-3.5-turbo"
+          ],
+          "description": "AI model to use for code generation. 'auto' will use the best available model from GitHub Copilot."
         }
       }
     },
