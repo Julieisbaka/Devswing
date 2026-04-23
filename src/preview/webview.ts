@@ -48,6 +48,59 @@ export class SwingWebView {
           break;
 
         case "httpRequest": {
+          const decodeRequestBody = (
+            body: any,
+            bodyEncoding: string | undefined
+          ): any => {
+            switch (bodyEncoding) {
+              case "none":
+              case undefined:
+                return body || undefined;
+              case "text":
+              case "json":
+                return body;
+              case "urlsearchparams":
+                return new URLSearchParams(body || "");
+              case "formdata": {
+                const formData = new FormData();
+                for (const [name, value] of body || []) {
+                  formData.append(name, value);
+                }
+                return formData;
+              }
+              case "arraybuffer":
+                return Uint8Array.from(body || []).buffer;
+              case "uint8array":
+                return Uint8Array.from(body || []);
+              default:
+                return body;
+            }
+          };
+
+          const encodeResponseBody = (
+            data: string | Uint8Array,
+            responseType: string | undefined
+          ): { body: any; bodyEncoding: string } => {
+            if (responseType === "arraybuffer") {
+              const bytes =
+                data instanceof Uint8Array
+                  ? data
+                  : new TextEncoder().encode(data);
+              return {
+                body: Array.from(bytes),
+                bodyEncoding: "arraybuffer",
+              };
+            }
+
+            return {
+              body:
+                typeof data === "string" ? data : byteArrayToString(data),
+              bodyEncoding: "text",
+            };
+          };
+
+          const requestBody = decodeRequestBody(value.body, value.bodyEncoding);
+
           let response: {
             data: string | Uint8Array;
             status: number;
@@ -57,7 +110,7 @@ export class SwingWebView {
           if (value.url.startsWith("http")) {
             const fetchResponse = await fetch(value.url, {
               method: value.method,
-              body: value.body || undefined,
+              body: requestBody,
               headers: JSON.parse(value.headers || "{}"),
             });
             const data =
@@ -81,20 +134,17 @@ export class SwingWebView {
             };
           }
 
-          const body =
-            value.responseType === "arraybuffer"
-              ? response.data instanceof Uint8Array
-                ? byteArrayToString(response.data)
-                : response.data
-              : typeof response.data === "string"
-                ? response.data
-                : byteArrayToString(response.data);
+          const { body, bodyEncoding } = encodeResponseBody(
+            response.data,
+            value.responseType
+          );
 
           webview.postMessage({
             command: "httpResponse",
             value: {
               id: value.id,
               body,
+              bodyEncoding,
               responseType: value.responseType,
               status: response.status,
               statusText: response.statusText,
@@ -463,6 +513,68 @@ export class SwingWebView {
       const pendingHttpRequests = new Map();
       const pendingFetchRequests = new Map();
 
+      function serializeRequestBody(body) {
+        if (body == null) {
+          return { body: undefined, bodyEncoding: "none" };
+        }
+
+        if (typeof body === "string") {
+          return { body, bodyEncoding: "text" };
+        }
+
+        if (body instanceof URLSearchParams) {
+          return { body: body.toString(), bodyEncoding: "urlsearchparams" };
+        }
+
+        if (body instanceof FormData) {
+          return {
+            body: Array.from(body.entries()).map(([name, value]) => [
+              name,
+              typeof value === "string" ? value : value.name,
+            ]),
+            bodyEncoding: "formdata",
+          };
+        }
+
+        if (body instanceof ArrayBuffer) {
+          return {
+            body: Array.from(new Uint8Array(body)),
+            bodyEncoding: "arraybuffer",
+          };
+        }
+
+        if (ArrayBuffer.isView(body)) {
+          return {
+            body: Array.from(new Uint8Array(body.buffer, body.byteOffset, body.byteLength)),
+            bodyEncoding: "uint8array",
+          };
+        }
+
+        if (typeof body === "object") {
+          return { body: JSON.stringify(body), bodyEncoding: "json" };
+        }
+
+        return { body: String(body), bodyEncoding: "text" };
+      }
+
+      function deserializeResponseBody(body, bodyEncoding, responseType) {
+        if (bodyEncoding === "arraybuffer") {
+          return Uint8Array.from(body || []).buffer;
+        }
+
+        if (responseType === "arraybuffer") {
+          if (Array.isArray(body)) {
+            return Uint8Array.from(body).buffer;
+          }
+
+          if (typeof body === "string") {
+            return new TextEncoder().encode(body).buffer;
+          }
+        }
+
+        return body;
+      }
+
       window.addEventListener("message", ({ data }) => {  
         if (data.command === "updateCSS") {
           style.textContent = data.value;
@@ -470,9 +582,11 @@ export class SwingWebView {
           const id = data.value.id;
           const status = data.value.status;
           const headers = JSON.parse(data.value.headers);
-
-          // TODO: Add support for other response types
-          const body = data.value.responseType === "arraybuffer" ? new TextEncoder().encode(data.value.body).buffer : data.value.body;
+          const body = deserializeResponseBody(
+            data.value.body,
+            data.value.bodyEncoding,
+            data.value.responseType
+          );
 
           if (data.value.source === "fetch") { 
             const resolve = pendingFetchRequests.get(id);
@@ -544,10 +658,10 @@ export class SwingWebView {
         originalLog.call(console, ...args);
       };
 
-      // TODO: Add support for sending FormData, URLSearchParams,
-      // ArrayBuffer, or Blob objects as the request body.
       const mockXHRServer = MockXMLHttpRequest.newServer();
       mockXHRServer.setDefaultHandler((xhr) => {
+        const serializedBody = serializeRequestBody(xhr.body);
+
         pendingHttpRequests.set(httpRequestId, xhr);
         vscode.postMessage({
           command: "httpRequest",
@@ -555,7 +669,8 @@ export class SwingWebView {
             id: httpRequestId++,
             url: xhr.url,
             method: xhr.method,
-            body: xhr.body,
+            body: serializedBody.body,
+            bodyEncoding: serializedBody.bodyEncoding,
             responseType: xhr.responseType,
             headers: JSON.stringify(xhr.headers || {}),
             source: "xhr"
@@ -566,6 +681,8 @@ export class SwingWebView {
 
       fetchMock.any((url, options = {}) => {
         return new Promise(async (resolve) => {
+          const serializedBody = serializeRequestBody(options.body);
+
           pendingFetchRequests.set(httpRequestId, resolve);
           vscode.postMessage({
             command: "httpRequest",
@@ -573,7 +690,8 @@ export class SwingWebView {
               id: httpRequestId++,
               url,
               method: options.method,
-              body: options.body,
+              body: serializedBody.body,
+              bodyEncoding: serializedBody.bodyEncoding,
               headers: JSON.stringify(options.headers || {}),
               source: "fetch"
             }

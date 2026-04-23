@@ -480,12 +480,15 @@ export async function openSwing(uri: Uri) {
           jsDocument &&
           jsDocument.uri.toString() !== document.uri.toString()
         ) {
-          // TODO: Clean up this logic
-          const fileName = path.basename(document.uri.toString());
-          files.push(fileName);
-          files = files.filter(
-            (file) => file !== path.basename(jsDocument.uri.toString())
-          );
+          const previousFileName = path.basename(jsDocument.uri.path);
+          const nextFileName = path.basename(document.uri.path);
+          files = [
+            ...new Set(
+              files
+                .filter((file) => file !== previousFileName)
+                .concat(nextFileName)
+            ),
+          ];
 
           htmlView.updateManifest(
             await getManifestContent(currentUri, files),
@@ -498,11 +501,34 @@ export async function openSwing(uri: Uri) {
         htmlView.updateManifest(document.getText(), runOnEdit);
 
         if (jsDocument) {
-          manifest = JSON.parse(document.getText());
+          let newManifest: SwingManifest;
+          try {
+            newManifest = JSON.parse(document.getText());
+          } catch {
+            // Skip expensive JS updates while the manifest is temporarily invalid JSON.
+            return;
+          }
 
-          // TODO: #7 Only update the JS if the manifest change
-          // actually impacts it (e.g. adding/removing react)
-          htmlView.updateJavaScript(jsDocument, runOnEdit);
+          const previousScripts = manifest.scripts || [];
+          const newScripts = newManifest.scripts || [];
+
+          // Only update JS if the scripts or styles arrays actually changed
+          const scriptsChanged =
+            previousScripts.length !== newScripts.length ||
+            previousScripts.some((script, index) => script !== newScripts[index]);
+
+          const previousStyles = manifest.styles || [];
+          const newStyles = newManifest.styles || [];
+          const stylesChanged =
+            previousStyles.length !== newStyles.length ||
+            previousStyles.some((style, index) => style !== newStyles[index]);
+
+          manifest = newManifest;
+
+          // Only update JS if the manifest change actually impacts it
+          if (scriptsChanged || stylesChanged) {
+            htmlView.updateJavaScript(jsDocument, runOnEdit);
+          }
         }
       } else if (isSwingDocumentOfType(document, SwingFileType.stylesheet)) {
         const content = await getStylesheetContent(document);
