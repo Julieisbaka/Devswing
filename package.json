@@ -82,6 +82,11 @@
         "category": "DevSwing"
       },
       {
+        "command": "devswing.newSwingInNewWindow",
+        "title": "New Swing in New Window...",
+        "category": "DevSwing"
+      },
+      {
         "command": "devswing.newSwingFromLastTemplate",
         "title": "New Swing from Last Template",
         "category": "DevSwing"

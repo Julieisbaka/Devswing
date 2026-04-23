@@ -6,14 +6,18 @@ import { DEFAULT_MANIFEST, openSwing } from "../preview";
 import { SwingFile, store } from "../store";
 import { stringToByteArray, withProgress } from "../utils";
 import {
-  enableGalleries,
-  loadGalleries,
-  registerTemplateProvider,
+    enableGalleries,
+    loadGalleries,
+    registerTemplateProvider,
 } from "./galleryProvider";
 import { initializeStorage, storage } from "./storage";
 
 interface DevSwingTemplateItem extends vscode.QuickPickItem {
   files?: SwingFile[];
+}
+
+interface NewSwingOptions {
+  openInNewWindow?: boolean;
 }
 
 async function createSwingDirectory() {
@@ -52,7 +56,8 @@ async function getTemplates(): Promise<DevSwingTemplateItem[]> {
 
 export async function newSwing(
   uri: vscode.Uri | ((files: SwingFile[]) => Promise<vscode.Uri>),
-  title: string = "Create new swing"
+  title: string = "Create new swing",
+  options: NewSwingOptions = {}
 ) {
   const quickPick = vscode.window.createQuickPick();
   quickPick.title = title;
@@ -104,9 +109,9 @@ export async function newSwing(
 
   quickPick.onDidTriggerButton((e) => {
     if (e.tooltip === copilotTooltip) {
-      synthesizeTemplate(uri);
+      synthesizeTemplate(uri, options);
     } else {
-      promptForGalleryConfiguration(uri, title);
+      promptForGalleryConfiguration(uri, title, options);
     }
   });
 
@@ -116,7 +121,7 @@ export async function newSwing(
     const template = quickPick.selectedItems[0] as DevSwingTemplateItem;
     if (template.files) {
       await withProgress("Creating swing...", async () =>
-        newSwingFromTemplate(template.files!, uri)
+        newSwingFromTemplate(template.files!, uri, options)
       );
 
       await storage.addTemplateToMRU(template.label);
@@ -127,7 +132,8 @@ export async function newSwing(
 }
 
 async function synthesizeTemplate(
-  uri: vscode.Uri | ((files: SwingFile[]) => Promise<vscode.Uri>)
+  uri: vscode.Uri | ((files: SwingFile[]) => Promise<vscode.Uri>),
+  options: NewSwingOptions = {}
 ) {
   const prompt = await vscode.window.showInputBox({
     placeHolder: "Describe the swing you want to generate",
@@ -136,13 +142,14 @@ async function synthesizeTemplate(
 
   await withProgress("Creating swing with Copilot...", async () => {
     const files = await generateSwingWithCopilot(prompt);
-    return newSwingFromTemplate(files!, uri);
+    return newSwingFromTemplate(files!, uri, options);
   });
 }
 
 async function newSwingFromTemplate(
   files: SwingFile[],
-  uri: vscode.Uri | ((files: SwingFile[]) => Promise<vscode.Uri>)
+  uri: vscode.Uri | ((files: SwingFile[]) => Promise<vscode.Uri>),
+  options: NewSwingOptions = {}
 ) {
   const manifest = files.find((file) => SWING_FILES.includes(file.filename));
   if (!manifest) {
@@ -185,12 +192,19 @@ async function newSwingFromTemplate(
     swingUri = uri;
   }
 
-  openSwing(swingUri);
+  if (options.openInNewWindow) {
+    await vscode.commands.executeCommand("vscode.openFolder", swingUri, {
+      forceNewWindow: true,
+    });
+  } else {
+    openSwing(swingUri);
+  }
 }
 
 async function promptForGalleryConfiguration(
   uri: vscode.Uri | ((files: SwingFile[]) => Promise<vscode.Uri>),
-  title: string
+  title: string,
+  options: NewSwingOptions = {}
 ) {
   const quickPick = vscode.window.createQuickPick();
   quickPick.title = "Configure template galleries";
@@ -208,7 +222,7 @@ async function promptForGalleryConfiguration(
   quickPick.buttons = [vscode.QuickInputButtons.Back];
   quickPick.onDidTriggerButton((e) => {
     if (e === vscode.QuickInputButtons.Back) {
-      return newSwing(uri, title);
+      return newSwing(uri, title, options);
     }
   });
 
@@ -221,7 +235,7 @@ async function promptForGalleryConfiguration(
 
     quickPick.hide();
 
-    return newSwing(uri, title);
+    return newSwing(uri, title, options);
   });
 
   quickPick.show();
@@ -237,6 +251,16 @@ export function registerCreationModule(
       const uri = await createSwingDirectory();
       newSwing(uri);
     })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      `${EXTENSION_NAME}.newSwingInNewWindow`,
+      async () => {
+        const uri = await createSwingDirectory();
+        newSwing(uri, "Create new swing", { openInNewWindow: true });
+      }
+    )
   );
 
   context.subscriptions.push(
