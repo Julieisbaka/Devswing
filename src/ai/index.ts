@@ -20,12 +20,12 @@ async function loadSystemPrompt(): Promise<string> {
 
   // Otherwise, load the default preamble
   try {
-    const preamblePath = path.join(__dirname, "..", "ai", "preamble.md");
+    const preamblePath = path.join(__dirname, "..", "ai", "preamble.txt");
     const content = fs.readFileSync(preamblePath, "utf-8");
     SYSTEM_PROMPT = content;
     return content;
   } catch (error) {
-    console.error("Failed to load preamble.md, using fallback:", error);
+    console.error("Failed to load preamble.txt, using fallback:", error);
     // Fallback prompt if file is not found
     SYSTEM_PROMPT = `You are DevSwing, a web development assistant. Generate complete, working web swing files when asked.
 A "swing" is a small self-contained web application consisting of HTML, CSS, and/or JavaScript files.
