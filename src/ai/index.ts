@@ -1,7 +1,24 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import { SwingFile } from "../store";
 
-const SYSTEM_PROMPT = `You are a web development assistant. Generate complete, working web swing files when asked.
+let SYSTEM_PROMPT: string | null = null;
+
+async function loadPreamble(): Promise<string> {
+  if (SYSTEM_PROMPT) {
+    return SYSTEM_PROMPT;
+  }
+
+  try {
+    const preamblePath = path.join(__dirname, "..", "ai", "preamble.md");
+    const content = fs.readFileSync(preamblePath, "utf-8");
+    SYSTEM_PROMPT = content;
+    return content;
+  } catch (error) {
+    console.error("Failed to load preamble.md, using fallback:", error);
+    // Fallback prompt if file is not found
+    SYSTEM_PROMPT = `You are DevSwing, a web development assistant. Generate complete, working web swing files when asked.
 A "swing" is a small self-contained web application consisting of HTML, CSS, and/or JavaScript files.
 
 Respond ONLY with file contents using this exact format — no prose, no explanations:
@@ -13,6 +30,9 @@ Rules:
 - Use "index.html" for HTML, "style.css" for CSS, "script.js" for JavaScript
 - Return complete, working code
 - When modifying existing files, return only changed files with their complete updated content`;
+    return SYSTEM_PROMPT;
+  }
+}
 
 function parseSwingFiles(response: string): SwingFile[] {
   const fileStart = response.indexOf("<<—[");
@@ -76,8 +96,9 @@ async function sendRequest(
 }
 
 export async function generateSwingWithCopilot(prompt: string): Promise<SwingFile[]> {
+  const systemPrompt = await loadPreamble();
   const messages = [
-    createUserMessage(SYSTEM_PROMPT),
+    createUserMessage(systemPrompt),
     createUserMessage(`REQUEST:\n${prompt}\n\nRESPONSE:`),
   ];
   return sendRequest(messages);
@@ -87,12 +108,13 @@ export async function refineSwingWithCopilot(
   prompt: string,
   currentFiles: SwingFile[]
 ): Promise<SwingFile[]> {
+  const systemPrompt = await loadPreamble();
   const currentContent = currentFiles
     .map((f) => `<<—[${f.filename}]=\n${f.content ?? ""}\n—>>`)
     .join("\n\n");
 
   const messages = [
-    createUserMessage(SYSTEM_PROMPT),
+    createUserMessage(systemPrompt),
     createUserMessage(
       `Here are the current swing files:\n\n${currentContent}\n\nModify the swing based on the request below. Return only files that changed, with their complete updated content. No prose.\n\nREQUEST:\n${prompt}\n\nRESPONSE:`
     ),

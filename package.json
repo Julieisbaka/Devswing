@@ -410,6 +410,13 @@
           "default": false,
           "type": "boolean",
           "description": "Specifies whether to apply Visual Studio Code theme to the preview window."
+        },
+        "devswing.hotReloadDelay": {
+          "default": 300,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5000,
+          "description": "Specifies the delay (in milliseconds) before updating the preview after code changes. Increase for better performance with large swings."
         }
       }
     },

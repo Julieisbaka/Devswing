@@ -9,6 +9,11 @@ import {
   getFileContents,
   stringToByteArray,
 } from "../utils";
+import {
+  detectImportedPackages,
+  findMissingPackages,
+  promptToInstallMissingPackages,
+} from "../utils/packageManager";
 import { exportSwingToCodePen, registerCodePenCommands } from "./codepen";
 import { registerSwingCommands } from "./commands";
 import { discoverLanguageProviders } from "./languages/languageProvider";
@@ -495,7 +500,7 @@ export async function openSwing(uri: Uri) {
         if (jsDocument) {
           manifest = JSON.parse(document.getText());
 
-          // TODO: Only update the JS if the manifest change
+          // TODO: #7 Only update the JS if the manifest change
           // actually impacts it (e.g. adding/removing react)
           htmlView.updateJavaScript(jsDocument, runOnEdit);
         }
@@ -514,7 +519,7 @@ export async function openSwing(uri: Uri) {
       } else if (isSwingDocument(document.uri) && runOnEdit) {
         htmlView.rebuildWebview();
       }
-    }, 100)
+    }, config.get("hotReloadDelay"))
   );
 
   let documentSaveDisposeable: vscode.Disposable;
@@ -527,6 +532,65 @@ export async function openSwing(uri: Uri) {
       }
     );
   }
+
+  // Check for missing packages when script document changes
+  const checkMissingPackages = debounce(
+    async (document: vscode.TextDocument) => {
+      if (!isSwingDocumentOfType(document, SwingFileType.script)) {
+        return;
+      }
+
+      const code = document.getText();
+      const importedPackages = detectImportedPackages(code);
+      const missingPackages = findMissingPackages(importedPackages, manifest);
+
+      if (missingPackages.length > 0) {
+        const manifestUri = getFileOfType(currentUri, files, SwingFileType.manifest);
+        if (!manifestUri) {
+          return;
+        }
+
+        await promptToInstallMissingPackages(
+          missingPackages,
+          async (packages) => {
+            try {
+              const manifestContent = await vscode.workspace.fs.readFile(manifestUri);
+              const currentManifest = JSON.parse(byteArrayToString(manifestContent));
+
+              currentManifest.scripts = [
+                ...(currentManifest.scripts || []),
+                ...packages,
+              ];
+              // Remove duplicates
+              currentManifest.scripts = [...new Set(currentManifest.scripts)];
+
+              await vscode.workspace.fs.writeFile(
+                manifestUri,
+                stringToByteArray(JSON.stringify(currentManifest, null, 2))
+              );
+
+              manifest = currentManifest;
+              vscode.window.showInformationMessage(
+                `Added ${packages.length} package(s) to manifest`
+              );
+            } catch (error) {
+              vscode.window.showErrorMessage(
+                `Failed to add packages: ${error instanceof Error ? error.message : String(error)}`
+              );
+            }
+          }
+        );
+      }
+    },
+    1000
+  );
+
+  const missingPackagesDisposable = vscode.workspace.onDidChangeTextDocument(
+    ({ document }) => {
+      checkMissingPackages(document);
+    }
+  );
+
 
   htmlView.updateManifest(manifest ? JSON.stringify(manifest) : "");
 
@@ -591,6 +655,7 @@ export async function openSwing(uri: Uri) {
 
     documentChangeDisposable.dispose();
     documentSaveDisposeable?.dispose();
+    missingPackagesDisposable.dispose();
 
     if (store.activeSwing?.hasTour) {
       endCurrentTour();

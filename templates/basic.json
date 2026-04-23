@@ -62,6 +62,19 @@
           "content": "{\"scripts\": [],\"showConsole\": true}"
         }
       ]
+    },
+    {
+      "title": "Angular Hello World",
+      "files": [
+        {
+          "filename": "index.html",
+          "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Angular DevSwing</title>\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <style>\n    body {\n      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;\n      margin: 0;\n      padding: 0;\n    }\n  </style>\n</head>\n<body>\n  <app-root></app-root>\n</body>\n</html>"
+        },
+        {
+          "filename": "app.component.ts",
+          "content": "import { Component } from '@angular/core';\n\n@Component({\n  selector: 'app-root',\n  template: `\n    <div style=\"text-align: center; padding: 2rem;\">\n      <h1>Hello Angular!</h1>\n      <p>Welcome to {{ title }}</p>\n      <button (click)=\"increment()\">Count: {{ count }}</button>\n    </div>\n  `,\n  styles: [`\n    :host {\n      display: block;\n      font-family: inherit;\n    }\n    button {\n      padding: 0.75rem 1.5rem;\n      font-size: 1rem;\n      background-color: #007bff;\n      color: white;\n      border: none;\n      border-radius: 4px;\n      cursor: pointer;\n      transition: background-color 0.2s;\n    }\n    button:hover {\n      background-color: #0056b3;\n    }\n  `]\n})\nexport class AppComponent {\n  title = 'Angular DevSwing';\n  count = 0;\n  \n  increment() {\n    this.count++;\n  }\n}"
+        }
+      ]
     }
   ]
 }
