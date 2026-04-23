@@ -731,7 +731,7 @@ export class SwingWebView {
         try {
         window.config = JSON.parse(config);
         } catch {
-          alert("The swing's config file ins't valid JSON.");
+          alert("The swing's config file isn't valid JSON.");
         }
       }
 

@@ -4,7 +4,7 @@ import { EXTENSION_NAME } from "../constants";
 import { store } from "../store";
 import initializeBaseService from "./service";
 
-// TODO: Replace this with a fixed version of the Live Share API
+// Temporary URI conversion workaround for current Live Share API behavior.
 function convertUri(uri: vscode.Uri): vscode.Uri {
   let workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
   const relativePath =
@@ -22,7 +22,7 @@ function convertUri(uri: vscode.Uri): vscode.Uri {
 
 export async function initializeService(vslsApi: vsls.LiveShare) {
   const service = await vslsApi.shareService(EXTENSION_NAME);
-  if (!service) return;
+  if (!service) {return;}
 
   service.onRequest("getActiveSwing", () => {
     if (!store.activeSwing) {

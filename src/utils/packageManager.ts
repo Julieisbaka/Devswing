@@ -7,11 +7,20 @@ import { SwingManifest } from "../store";
 export function detectImportedPackages(code: string): string[] {
   const packages = new Set<string>();
 
-  // Match ES6 imports: import x from 'package' or import 'package'
-  const esImportRegex = /import\s+(?:(?:(?:\{[^}]*\}|\*\s+as\s+\w+|[^,\s]*),?\s*)*)?from\s+['"`]([^'"`]+)['"`]/g;
+  // Match ES6 imports with bindings: import x from 'pkg', import {x} from 'pkg', import * as x from 'pkg'
+  const importFromRegex = /import\s+[^'"\n;]*?\sfrom\s+['"]([^'"]+)['"]/g;
   let match;
 
-  while ((match = esImportRegex.exec(code)) !== null) {
+  while ((match = importFromRegex.exec(code)) !== null) {
+    const packageName = extractPackageName(match[1]);
+    if (packageName) {
+      packages.add(packageName);
+    }
+  }
+
+  // Match side-effect imports: import 'pkg'
+  const sideEffectImportRegex = /import\s+['"`]([^'"`]+)['"`]/g;
+  while ((match = sideEffectImportRegex.exec(code)) !== null) {
     const packageName = extractPackageName(match[1]);
     if (packageName) {
       packages.add(packageName);

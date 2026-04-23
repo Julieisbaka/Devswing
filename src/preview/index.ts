@@ -62,6 +62,26 @@ export const DEFAULT_MANIFEST = {
   styles: [] as string[],
 };
 
+function hasArrayChanged(previous: string[] = [], next: string[] = []) {
+  return (
+    previous.length !== next.length ||
+    previous.some((value, index) => value !== next[index])
+  );
+}
+
+function updateFilesForRenamedScript(
+  files: string[],
+  previousScriptUri: vscode.Uri,
+  nextScriptUri: vscode.Uri
+) {
+  const previousFileName = path.basename(previousScriptUri.path);
+  const nextFileName = path.basename(nextScriptUri.path);
+
+  return [
+    ...new Set(files.filter((file) => file !== previousFileName).concat(nextFileName)),
+  ];
+}
+
 async function getCanvasContent(uri: Uri, files: string[]) {
   if (!files.includes(CANVAS_FILE)) {
     return "";
@@ -76,24 +96,80 @@ async function getManifestContent(uri: Uri, files: string[]) {
     return JSON.stringify(DEFAULT_MANIFEST);
   }
 
-  const manifest = byteArrayToString(await vscode.workspace.fs.readFile(manifestUri));
-  /*
-  if (includesReactFiles(files)) {
-    const parsedManifest = JSON.parse(manifest);
-    if (!includesReactScripts(parsedManifest.scripts)) {
-      parsedManifest.scripts.push(...REACT_SCRIPTS);
-      parsedManifest.scripts = [...new Set(parsedManifest.scripts)];
+  return byteArrayToString(await vscode.workspace.fs.readFile(manifestUri));
+}
 
-      const content = JSON.stringify(parsedManifest, null, 2);
+async function loadManifest(uri: Uri, files: string[]): Promise<SwingManifest> {
+  if (!getFileOfType(uri, files, SwingFileType.manifest)) {
+    return {};
+  }
 
-      const manifestUri = getFileOfType(uri, files, SwingFileType.manifest);
+  try {
+    const manifestContent = await getManifestContent(uri, files);
+    return JSON.parse(manifestContent);
+  } catch {
+    return {};
+  }
+}
 
-      vscode.workspace.fs.writeFile(manifestUri!, stringToByteArray(content));
-      return content;
+async function resolveTutorialContext(
+  rootUri: Uri,
+  initialFiles: string[],
+  manifest: SwingManifest
+): Promise<{
+  currentUri: Uri;
+  files: string[];
+  manifest: SwingManifest;
+  totalTutorialSteps?: number;
+}> {
+  let currentUri = rootUri;
+  let files = initialFiles;
+  let resolvedManifest = manifest;
+  let totalTutorialSteps: number | undefined;
+
+  if (resolvedManifest.tutorial) {
+    const currentTutorialStep = storage.currentTutorialStep(rootUri);
+    const tutorialSteps = files.filter((file) =>
+      file.match(TUTORIAL_STEP_PATTERN)
+    );
+
+    totalTutorialSteps = tutorialSteps.reduce((maxStep, fileName) => {
+      const step = Number(TUTORIAL_STEP_PATTERN.exec(fileName)!.groups!.step);
+      return step > maxStep ? step : maxStep;
+    }, 0);
+
+    const stepDirectory = files.find((file) =>
+      file.match(new RegExp(`^#?${currentTutorialStep}`))
+    );
+
+    currentUri = Uri.joinPath(rootUri, stepDirectory!, "/");
+    files = (await vscode.workspace.fs.readDirectory(currentUri)).map(
+      ([file, _]) => file
+    );
+
+    const stepManifestFile = getFileOfType(
+      currentUri,
+      files,
+      SwingFileType.manifest
+    );
+
+    if (stepManifestFile) {
+      const stepManifest = byteArrayToString(
+        await vscode.workspace.fs.readFile(stepManifestFile)
+      );
+      resolvedManifest = {
+        ...resolvedManifest,
+        ...JSON.parse(stepManifest),
+      };
     }
-  }*/
+  }
 
-  return manifest;
+  return {
+    currentUri,
+    files,
+    manifest: resolvedManifest,
+    totalTutorialSteps,
+  };
 }
 
 function localeCompare(a: string, b: string) {
@@ -239,58 +315,12 @@ export async function openSwing(uri: Uri) {
   );
   const rootFiles = files;
 
-  let manifest: SwingManifest = {};
-  if (getFileOfType(uri, files, SwingFileType.manifest)) {
-    try {
-      const manifestContent = await getManifestContent(uri, files);
-      manifest = JSON.parse(manifestContent);
-    } catch {}
-  }
-
-  let currentTutorialStep: number | undefined;
-  let totalTutorialSteps: number | undefined;
-
-  if (manifest.tutorial) {
-    currentTutorialStep = storage.currentTutorialStep(uri);
-    const tutoralSteps = files.filter((file) =>
-      file.match(TUTORIAL_STEP_PATTERN)
-    );
-
-    totalTutorialSteps = tutoralSteps.reduce((maxStep, fileName) => {
-      const step = Number(TUTORIAL_STEP_PATTERN.exec(fileName)!.groups!.step);
-
-      if (step > maxStep) {
-        return step;
-      } else {
-        return maxStep;
-      }
-    }, 0);
-
-    const stepDirectory = files.find((file) =>
-      file.match(new RegExp(`^#?${currentTutorialStep}`))
-    );
-
-    currentUri = Uri.joinPath(uri, stepDirectory!, "/");
-    files = (await vscode.workspace.fs.readDirectory(currentUri)).map(
-      ([file, _]) => file
-    );
-
-    const stepManifestFile = getFileOfType(
-      currentUri,
-      files,
-      SwingFileType.manifest
-    );
-
-    if (stepManifestFile) {
-      const stepManifest = byteArrayToString(
-        await vscode.workspace.fs.readFile(stepManifestFile)
-      );
-      manifest = {
-        ...manifest,
-        ...JSON.parse(stepManifest),
-      };
-    }
-  }
+  let manifest: SwingManifest = await loadManifest(uri, files);
+  const tutorialContext = await resolveTutorialContext(uri, files, manifest);
+  currentUri = tutorialContext.currentUri;
+  files = tutorialContext.files;
+  manifest = tutorialContext.manifest;
+  const totalTutorialSteps = tutorialContext.totalTutorialSteps;
 
   const markupFile = getFileOfType(currentUri, files, SwingFileType.markup);
   const stylesheetFile = getFileOfType(
@@ -474,21 +504,13 @@ export async function openSwing(uri: Uri) {
         }
       } else if (isSwingDocumentOfType(document, SwingFileType.script)) {
         // If the user renamed the script file (e.g. from *.js to *.jsx)
-        // than we need to update the manifest in case new scripts
+        // then we need to update the manifest in case new scripts
         // need to be injected into the webview (e.g. "react").
         if (
           jsDocument &&
           jsDocument.uri.toString() !== document.uri.toString()
         ) {
-          const previousFileName = path.basename(jsDocument.uri.path);
-          const nextFileName = path.basename(document.uri.path);
-          files = [
-            ...new Set(
-              files
-                .filter((file) => file !== previousFileName)
-                .concat(nextFileName)
-            ),
-          ];
+          files = updateFilesForRenamedScript(files, jsDocument.uri, document.uri);
 
           htmlView.updateManifest(
             await getManifestContent(currentUri, files),
@@ -509,19 +531,14 @@ export async function openSwing(uri: Uri) {
             return;
           }
 
-          const previousScripts = manifest.scripts || [];
-          const newScripts = newManifest.scripts || [];
-
-          // Only update JS if the scripts or styles arrays actually changed
-          const scriptsChanged =
-            previousScripts.length !== newScripts.length ||
-            previousScripts.some((script, index) => script !== newScripts[index]);
-
-          const previousStyles = manifest.styles || [];
-          const newStyles = newManifest.styles || [];
-          const stylesChanged =
-            previousStyles.length !== newStyles.length ||
-            previousStyles.some((style, index) => style !== newStyles[index]);
+          const scriptsChanged = hasArrayChanged(
+            manifest.scripts || [],
+            newManifest.scripts || []
+          );
+          const stylesChanged = hasArrayChanged(
+            manifest.styles || [],
+            newManifest.styles || []
+          );
 
           manifest = newManifest;
 
@@ -548,9 +565,9 @@ export async function openSwing(uri: Uri) {
     }, config.get("hotReloadDelay"))
   );
 
-  let documentSaveDisposeable: vscode.Disposable;
+  let documentSaveDisposable: vscode.Disposable;
   if (!runOnEdit && autoRun === "onSave") {
-    documentSaveDisposeable = vscode.workspace.onDidSaveTextDocument(
+    documentSaveDisposable = vscode.workspace.onDidSaveTextDocument(
       (document) => {
         if (isSwingDocument(document.uri)) {
           htmlView.rebuildWebview();
@@ -680,7 +697,7 @@ export async function openSwing(uri: Uri) {
     output.dispose();
 
     documentChangeDisposable.dispose();
-    documentSaveDisposeable?.dispose();
+    documentSaveDisposable?.dispose();
     missingPackagesDisposable.dispose();
 
     if (store.activeSwing?.hasTour) {
