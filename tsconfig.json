@@ -1,16 +1,21 @@
 {
-	"exclude": ["node_modules"],
+	"exclude": [
+		"node_modules"
+	],
 	"compilerOptions": {
-	  "module": "commonjs",
-	  "target": "ES2019",
-	  "outDir": "out",
-	  "lib": ["ES2019", "DOM"],
-	  "sourceMap": true,
-	  "rootDir": "src",
-	  "strict": true,
-	  "noUnusedLocals": true,
-	  "ignoreDeprecations": "6.0",
-	  "baseUrl": ".",
-	  "experimentalDecorators": true
+		"module": "commonjs",
+		"target": "ES2019",
+		"outDir": "out",
+		"lib": [
+			"ES2019",
+			"DOM",
+			"DOM.Iterable"
+		],
+		"sourceMap": true,
+		"rootDir": "src",
+		"strict": true,
+		"noUnusedLocals": true,
+		"baseUrl": ".",
+		"experimentalDecorators": true
 	}
-  }
+}
