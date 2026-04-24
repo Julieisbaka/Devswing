@@ -13,7 +13,7 @@
   "icon": "images/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lostintangent/codeswing"
+    "url": "https://github.com/Julieisbaka/Devswing"
   },
   "extensionKind": [
     "ui",
@@ -41,6 +41,7 @@
     "onCommand:codeswing.openSwingInNewWindow",
     "onCommand:codeswing.openWorkspaceSwing",
     "onCommand:codeswing.recordCodeTour",
+    "onCommand:codeswing.refreshTemplateGalleries",
     "onCommand:codeswing.refineWithCopilot",
     "onCommand:codeswing.renameSwingFile",
     "onCommand:codeswing.run",
@@ -154,6 +155,12 @@
         "icon": "$(record)"
       },
       {
+        "command": "devswing.refreshTemplateGalleries",
+        "title": "Refresh Template Galleries",
+        "category": "DevSwing",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "devswing.renameSwingFile",
         "title": "Rename File"
       },
@@ -226,6 +233,9 @@
         },
         {
           "command": "devswing.browseRecentSwings"
+        },
+        {
+          "command": "devswing.refreshTemplateGalleries"
         },
         {
           "command": "devswing.openDeveloperTools",
@@ -523,7 +533,9 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "node --max-old-space-size=8192 node_modules/webpack/bin/webpack.js",
+    "vscode:prepublish": "node --max-old-space-size=8192 node_modules/webpack/bin/webpack.js --mode production",
+    "webpack:dev": "webpack --mode development",
+    "webpack:prod": "webpack --mode production",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",

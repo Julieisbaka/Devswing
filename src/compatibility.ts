@@ -21,6 +21,7 @@ const LEGACY_COMMANDS = [
   "openSwingInNewWindow",
   "openWorkspaceSwing",
   "recordCodeTour",
+  "refreshTemplateGalleries",
   "refineWithCopilot",
   "renameSwingFile",
   "run",

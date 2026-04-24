@@ -9,6 +9,7 @@ import { stringToByteArray, withProgress } from "../utils";
 import {
   enableGalleries,
   loadGalleries,
+  refreshGalleries,
   registerTemplateProvider,
 } from "./galleryProvider";
 import { initializeStorage, storage } from "./storage";
@@ -272,6 +273,18 @@ export function registerCreationModule(
       async () => {
         const uri = await createSwingDirectory();
         newSwing(uri, "Create new swing", { openInNewWindow: true });
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      `${EXTENSION_NAME}.refreshTemplateGalleries`,
+      async () => {
+        await withProgress("Refreshing template galleries...", () =>
+          refreshGalleries()
+        );
+        vscode.window.showInformationMessage("Template galleries refreshed.");
       }
     )
   );

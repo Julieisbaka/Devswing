@@ -22,6 +22,7 @@ const CONTRIBUTION_NAME = `${EXTENSION_NAME}.templateGalleries`;
 
 let loadGalleriesRunning = false;
 let loadGalleriesPromise: Promise<Gallery[]> = Promise.resolve([]);
+let forceReload = false;
 
 export async function loadGalleries() {
   if (loadGalleriesRunning) {
@@ -79,7 +80,10 @@ export async function loadGalleries() {
     const galleries = await Promise.all(
       registrations.map(async (gallery) => {
         if (gallery.url) {
-          const data = await fetch(gallery.url).then((r) => r.json());
+          const url = forceReload
+            ? `${gallery.url}${gallery.url.includes("?") ? "&" : "?"}t=${Date.now()}`
+            : gallery.url;
+          const data = await fetch(url, { cache: "no-store" }).then((r) => r.json());
 
           gallery.title = data.title;
           gallery.description = data.description;
@@ -102,6 +106,7 @@ export async function loadGalleries() {
     );
 
     loadGalleriesRunning = false;
+    forceReload = false;
     resolve(galleries);
   });
 
@@ -110,6 +115,15 @@ export async function loadGalleries() {
 
 export async function enableGalleries(galleryIds: string[]) {
   await config.set("templateGalleries", galleryIds);
+  return loadGalleries();
+}
+
+export async function refreshGalleries() {
+  forceReload = true;
+  if (loadGalleriesRunning) {
+    return loadGalleriesPromise;
+  }
+
   return loadGalleries();
 }
 

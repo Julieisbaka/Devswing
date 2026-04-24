@@ -13,4 +13,15 @@ templates
 out/**
 *.vsix
 debug.log
+package-lock.json
+global.d.ts
+*.tsbuildinfo
+coverage/**
+.nyc_output/**
+.cache/**
+tmp/**
+temp/**
+.DS_Store
+Thumbs.db
+dist/**/*.map
 

@@ -73,3 +73,49 @@ templates:
       - filename: "index.pug"
       - filename: "script.ts"
       - filename: "style.scss"
+
+  - title: "HTML + Angular (TypeScript)"
+    files:
+      - filename: "index.html"
+        content: "<app-root></app-root>"
+      - filename: "app.component.ts"
+        content: |
+          import { Component } from '@angular/core';
+
+          @Component({
+            selector: 'app-root',
+            template: `
+              <div style="text-align: center; padding: 2rem;">
+                <h1>Hello {{ name }}!</h1>
+                <button (click)="name = 'Angular'">Click me</button>
+              </div>
+            `
+          })
+          export class AppComponent {
+            name = 'world';
+          }
+
+  - title: "HTML + Angular Standalone"
+    files:
+      - filename: "index.html"
+        content: "<app-root></app-root>"
+      - filename: "app.component.ts"
+        content: |
+          import { Component } from '@angular/core';
+          import { CommonModule } from '@angular/common';
+          import { FormsModule } from '@angular/forms';
+
+          @Component({
+            selector: 'app-root',
+            standalone: true,
+            imports: [CommonModule, FormsModule],
+            template: `
+              <div style="text-align: center; padding: 2rem;">
+                <h1>Hello {{ name }}!</h1>
+                <input [(ngModel)]="name" placeholder="Enter name" />
+              </div>
+            `
+          })
+          export class AppComponent {
+            name = 'world';
+          }
