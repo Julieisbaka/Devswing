@@ -1,6 +1,12 @@
 import { workspace } from "vscode";
 import { EXTENSION_NAME } from "./constants";
 
+export interface CustomLayoutConfig {
+  name: string;
+  orientation?: number;
+  groups: any[];
+}
+
 export function get(key: "autoRun"): "onEdit" | "onSave" | "never";
 export function get(key: "autoSave"): boolean;
 export function get(key: "clearConsoleOnRun"): boolean;
@@ -20,6 +26,7 @@ export function get(key: "hotReloadDelay"): number;
 export function get(key: "loopProtection"): boolean;
 export function get(key: "aiSystemPrompt"): string;
 export function get(key: "aiModel"): string;
+export function get(key: "customLayouts"): CustomLayoutConfig[];
 export function get(key: any) {
   const extensionConfig = workspace.getConfiguration(EXTENSION_NAME);
   return extensionConfig.get(key);

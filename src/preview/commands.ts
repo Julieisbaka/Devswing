@@ -280,9 +280,20 @@ export async function registerSwingCommands(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       `${EXTENSION_NAME}.changeLayout`,
       async () => {
-        const items = Object.keys(SwingLayout).map((layout) => {
-          return { label: capitalizeFirst(layout), layout };
-        });
+        const builtInItems = Object.keys(SwingLayout).map((layout) => ({
+          label: capitalizeFirst(layout),
+          layout,
+          description: undefined as string | undefined,
+        }));
+
+        const customLayouts = config.get("customLayouts") ?? [];
+        const customItems = customLayouts.map((c) => ({
+          label: c.name,
+          layout: c.name,
+          description: "custom preset",
+        }));
+
+        const items = [...builtInItems, ...customItems];
         const result = await vscode.window.showQuickPick(items, {
           placeHolder: "Select the layout to use for swings",
         });

@@ -410,6 +410,37 @@
           ],
           "description": "Specifies how to layout the editor windows when opening a swing."
         },
+        "devswing.customLayouts": {
+          "type": "array",
+          "default": [],
+          "description": "Custom editor layout presets. Each item requires a 'name' and 'groups' property matching the VS Code editor layout format (https://code.visualstudio.com/api/references/vscode-api#vscode.setEditorLayout). Set 'devswing.layout' to the preset name to activate it.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "groups"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Unique display name for this layout preset."
+              },
+              "orientation": {
+                "type": "number",
+                "enum": [
+                  0,
+                  1
+                ],
+                "description": "0 = horizontal (side-by-side, default), 1 = vertical (stacked)."
+              },
+              "groups": {
+                "type": "array",
+                "description": "Array of editor group objects as accepted by vscode.setEditorLayout."
+              }
+            }
+          }
+        },
         "devswing.readmeBehavior": {
           "default": "none",
           "enum": [
@@ -511,6 +542,12 @@
         "when": "devswing:inSwing",
         "key": "cmd+shift+b",
         "win": "ctrl+shift+b"
+      },
+      {
+        "command": "devswing.run",
+        "when": "devswing:inSwing",
+        "key": "cmd+alt+r",
+        "win": "ctrl+alt+r"
       }
     ],
     "devswing.templateGalleries": [

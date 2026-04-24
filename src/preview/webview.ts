@@ -477,19 +477,27 @@ export class SwingWebView {
         }, '*');
       }
 
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowLeft') {
+          navigateTutorial(-1);
+        } else if (event.key === 'ArrowRight') {
+          navigateTutorial(1);
+        }
+      });
+
       </script>
     </head>
     <body>
-      <navigation>
+      <navigation role='navigation' aria-label='Tutorial navigation'>
       ${title}
       <div>
       <button type='button' onclick='navigateTutorial(-1)' ${
         currentTutorialStep === 1 ? "disabled" : ""
-      } aria-label='Previous step'>&larr;</button>
-      <span>Step ${currentTutorialStep} of ${this.totalTutorialSteps}</span>
+      } aria-label='Previous tutorial step'>&larr;</button>
+      <span role='status' aria-live='polite'>Step ${currentTutorialStep} of ${this.totalTutorialSteps}</span>
       <button type='button' onclick='navigateTutorial(1)' ${
         currentTutorialStep === this.totalTutorialSteps ? "disabled" : ""
-      } aria-label='Next step'>&rarr;</button>
+      } aria-label='Next tutorial step'>&rarr;</button>
       </div>
       </navigation>
     </body>
@@ -705,12 +713,22 @@ export class SwingWebView {
         const text = document.getElementById("devswing-error-overlay-message");
         text.textContent = message || "Unknown preview error";
         overlay.style.display = "block";
+        overlay.focus();
       }
 
       function hideErrorOverlay() {
         const overlay = document.getElementById("devswing-error-overlay");
         overlay.style.display = "none";
       }
+
+      const overlayCloseButton = document.getElementById("devswing-error-overlay-close");
+      overlayCloseButton?.addEventListener("click", hideErrorOverlay);
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          hideErrorOverlay();
+        }
+      });
 
       window.addEventListener("error", (event) => {
         const reason = event?.error?.stack || event?.error?.message || event.message || "Unknown runtime error";
@@ -819,13 +837,17 @@ export class SwingWebView {
 
       const LINK_PREFIX = "swing:";
       document.addEventListener("click", (e) => {
-        if (e.target.href) {
+        const target = e.target instanceof Element ? e.target.closest("a") : null;
+        if (target && target.href) {
           e.preventDefault();
 
-          if (e.target.href.startsWith(LINK_PREFIX)) {
-            const href = e.target.href.replace(LINK_PREFIX, "");
+          if (target.href.startsWith(LINK_PREFIX)) {
+            const href = target.href.replace(LINK_PREFIX, "");
             const [file, lineColumn] = href.split("@");
             const [line, column] = lineColumn ? lineColumn.split(":") : [];
+            const label = "Open " + file + " at line " + (Number(line) || 1) + ", column " + (Number(column) || 1);
+            target.setAttribute("aria-label", label);
+            target.setAttribute("title", label);
 
             vscode.postMessage({
               command: "navigateCode",
@@ -835,10 +857,10 @@ export class SwingWebView {
                 column: Number(column) || 1
               }
             });
-          } else if (!e.target.href.startsWith("http")) {
+          } else if (!target.href.startsWith("http")) {
             vscode.postMessage({
               command: "openUrl",
-              value: e.target.href
+              value: target.href
             });
           }
         }
@@ -862,8 +884,11 @@ export class SwingWebView {
     </script>
   </head>
   <body>
-    <div id="devswing-error-overlay" role="alert" aria-live="assertive">
-      <h3>Preview error</h3>
+    <div id="devswing-error-overlay" role="alert" aria-live="assertive" aria-labelledby="devswing-error-title" tabindex="-1">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <h3 id="devswing-error-title" style="margin:0;">Preview error</h3>
+        <button id="devswing-error-overlay-close" type="button" aria-label="Dismiss preview error">Dismiss</button>
+      </div>
       <pre id="devswing-error-overlay-message"></pre>
     </div>
     ${scripts}

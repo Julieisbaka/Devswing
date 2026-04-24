@@ -72,8 +72,19 @@ export async function createLayoutManager(
   let currentViewColumn = ViewColumn.One;
   let previewViewColumn = includedFiles + 1;
 
+  // Check for a user-defined custom layout preset first.
+  const customLayouts = config.get("customLayouts") ?? [];
+  const customPreset = customLayouts.find((c) => c.name === layout);
+
   let editorLayout: any;
-  if (includedFiles === 3) {
+  if (customPreset) {
+    editorLayout = {
+      ...(customPreset.orientation !== undefined && {
+        orientation: customPreset.orientation,
+      }),
+      groups: customPreset.groups,
+    };
+  } else if (includedFiles === 3) {
     editorLayout =
       layout === SwingLayout.grid
         ? EDITOR_LAYOUTS.grid
@@ -84,7 +95,8 @@ export async function createLayoutManager(
     editorLayout = EDITOR_LAYOUTS.splitOne;
   }
 
-  if (layout === SwingLayout.splitRight) {
+  if (!customPreset) {
+    if (layout === SwingLayout.splitRight) {
     editorLayout = {
       ...editorLayout,
       groups: [...editorLayout.groups].reverse(),
@@ -114,6 +126,7 @@ export async function createLayoutManager(
     currentViewColumn = ViewColumn.Two;
     previewViewColumn = ViewColumn.One;
   }
+  } // end if (!customPreset)
 
   await commands.executeCommand("workbench.action.closeAllEditors");
   await commands.executeCommand("workbench.action.closePanel");
