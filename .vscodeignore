@@ -10,4 +10,7 @@ node_modules
 webpack.config.js
 templates
 *.log
+out/**
+*.vsix
+debug.log
 

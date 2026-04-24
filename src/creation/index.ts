@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import { generateSwingWithCopilot, isCopilotAvailable } from "../ai";
 import * as config from "../config";
@@ -6,9 +7,9 @@ import { DEFAULT_MANIFEST, openSwing } from "../preview";
 import { SwingFile, store } from "../store";
 import { stringToByteArray, withProgress } from "../utils";
 import {
-    enableGalleries,
-    loadGalleries,
-    registerTemplateProvider,
+  enableGalleries,
+  loadGalleries,
+  registerTemplateProvider,
 } from "./galleryProvider";
 import { initializeStorage, storage } from "./storage";
 
@@ -28,13 +29,25 @@ async function createSwingDirectory() {
   const h12 = h % 12 || 12;
   const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} (${pad(h12)}-${pad(now.getMinutes())}-${pad(now.getSeconds())} ${ampm})`;
 
+  const tempRootDirectory = config.get("tempRootDirectory");
   const rootDirectory = config.get("rootDirectory");
-  const rootUri = rootDirectory
-    ? vscode.Uri.joinPath(
-        vscode.workspace.workspaceFolders![0].uri,
-        rootDirectory
-      )
-    : store.globalStorageUri!;
+  let rootUri = store.globalStorageUri!;
+
+  if (tempRootDirectory) {
+    rootUri = path.isAbsolute(tempRootDirectory)
+      ? vscode.Uri.file(tempRootDirectory)
+      : vscode.workspace.workspaceFolders
+        ? vscode.Uri.joinPath(
+            vscode.workspace.workspaceFolders[0].uri,
+            tempRootDirectory
+          )
+        : rootUri;
+  } else if (rootDirectory) {
+    rootUri = vscode.Uri.joinPath(
+      vscode.workspace.workspaceFolders![0].uri,
+      rootDirectory
+    );
+  }
 
   const swingDirectory = vscode.Uri.joinPath(rootUri, timestamp);
 

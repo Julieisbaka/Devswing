@@ -12,10 +12,12 @@ export function get(
   key: "readmeBehavior"
 ): "none" | "previewFooter" | "previewHeader";
 export function get(key: "rootDirectory"): string;
+export function get(key: "tempRootDirectory"): string | null;
 export function get(key: "showConsole"): boolean;
 export function get(key: "templateGalleries"): string[];
 export function get(key: "themePreview"): boolean;
 export function get(key: "hotReloadDelay"): number;
+export function get(key: "loopProtection"): boolean;
 export function get(key: "aiSystemPrompt"): string;
 export function get(key: "aiModel"): string;
 export function get(key: any) {

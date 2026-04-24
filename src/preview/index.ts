@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { Uri } from "vscode";
 import * as config from "../config";
 import { EXTENSION_NAME, INPUT_SCHEME, SWING_FILES } from "../constants";
+import { storage as creationStorage } from "../creation/storage";
 import { SwingFileType, SwingManifest, store } from "../store";
 import {
   byteArrayToString,
@@ -29,6 +30,7 @@ import {
 import {
   SCRIPT_BASE_NAME,
   SCRIPT_EXTENSIONS,
+  getScriptLanguageLabel,
   includesReactFiles,
 } from "./languages/script";
 import {
@@ -80,6 +82,24 @@ function updateFilesForRenamedScript(
   return [
     ...new Set(files.filter((file) => file !== previousFileName).concat(nextFileName)),
   ];
+}
+
+function getLanguageLabel(fileName: string) {
+  const extension = path.extname(fileName).toLocaleLowerCase();
+
+  if (SCRIPT_EXTENSIONS.includes(extension)) {
+    return getScriptLanguageLabel(extension);
+  }
+
+  if (STYLESHEET_EXTENSIONS.includes(extension)) {
+    return extension.slice(1) || "stylesheet";
+  }
+
+  if (README_EXTENSIONS.includes(extension)) {
+    return "markdown";
+  }
+
+  return extension.slice(1) || "unknown";
 }
 
 async function getCanvasContent(uri: Uri, files: string[]) {
@@ -419,6 +439,8 @@ export async function openSwing(uri: Uri) {
 
   const output = vscode.window.createOutputChannel("DevSwing");
 
+  await creationStorage.addRecentTempSwing(uri);
+
   // In order to provide CodePen interop,
   // we'll look for an optional "scripts"
   // file, which includes the list of external
@@ -491,16 +513,40 @@ export async function openSwing(uri: Uri) {
       thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
     } else {
       const htmlContent = getReadmeContent(rawContent);
-      htmlView.updateReadme(htmlContent || "", runOnEdit);
+      if (htmlContent === null) {
+        output.appendLine(
+          `Failed to compile README content (language: markdown, file: README.*).`
+        );
+        htmlView.showErrorOverlay(
+          "README preview failed to compile (markdown). Check the DevSwing output for details."
+        );
+      } else {
+        htmlView.updateReadme(htmlContent, runOnEdit);
+      }
     }
   }
 
   const documentChangeDisposable = vscode.workspace.onDidChangeTextDocument(
     debounce(async ({ document }) => {
       if (isSwingDocumentOfType(document, SwingFileType.markup)) {
-        const content = await getMarkupContent(document);
-        if (content !== null) {
-          htmlView.updateHTML(content, runOnEdit);
+        try {
+          const content = await getMarkupContent(document);
+          if (content !== null) {
+            htmlView.updateHTML(content, runOnEdit);
+          } else {
+            throw new Error("Compiler returned no content.");
+          }
+        } catch (error) {
+          const fileName = path.basename(document.uri.fsPath);
+          const language = getLanguageLabel(fileName);
+          const message =
+            error instanceof Error ? error.message : String(error);
+          output.appendLine(
+            `Failed to compile markup file '${fileName}' (language: ${language}): ${message}`
+          );
+          htmlView.showErrorOverlay(
+            `Failed to compile '${fileName}' (${language}). Check the DevSwing output for details.`
+          );
         }
       } else if (isSwingDocumentOfType(document, SwingFileType.script)) {
         // If the user renamed the script file (e.g. from *.js to *.jsx)
@@ -518,7 +564,7 @@ export async function openSwing(uri: Uri) {
           );
         }
 
-        htmlView.updateJavaScript(document, runOnEdit);
+        await htmlView.updateJavaScript(document, runOnEdit);
       } else if (isSwingDocumentOfType(document, SwingFileType.manifest)) {
         htmlView.updateManifest(document.getText(), runOnEdit);
 
@@ -548,9 +594,24 @@ export async function openSwing(uri: Uri) {
           }
         }
       } else if (isSwingDocumentOfType(document, SwingFileType.stylesheet)) {
-        const content = await getStylesheetContent(document);
-        if (content !== null) {
-          htmlView.updateCSS(content, runOnEdit);
+        try {
+          const content = await getStylesheetContent(document);
+          if (content !== null) {
+            htmlView.updateCSS(content, runOnEdit);
+          } else {
+            throw new Error("Compiler returned no content.");
+          }
+        } catch (error) {
+          const fileName = path.basename(document.uri.fsPath);
+          const language = getLanguageLabel(fileName);
+          const message =
+            error instanceof Error ? error.message : String(error);
+          output.appendLine(
+            `Failed to compile stylesheet file '${fileName}' (language: ${language}): ${message}`
+          );
+          htmlView.showErrorOverlay(
+            `Failed to compile '${fileName}' (${language}). Check the DevSwing output for details.`
+          );
         }
       } else if (isSwingDocumentOfType(document, SwingFileType.readme)) {
         const rawContent = document.getText();
@@ -651,17 +712,56 @@ export async function openSwing(uri: Uri) {
 
   htmlView.updateManifest(manifest ? JSON.stringify(manifest) : "");
 
-  htmlView.updateHTML(
-    !!markupFile
-      ? (await getMarkupContent(htmlDocument!)) || ""
-      : await getCanvasContent(uri, rootFiles)
-  );
-  htmlView.updateCSS(
-    !!stylesheetFile ? (await getStylesheetContent(cssDocument!)) || "" : ""
-  );
+  if (!!markupFile) {
+    try {
+      const initialMarkup = await getMarkupContent(htmlDocument!);
+      if (initialMarkup === null) {
+        throw new Error("Compiler returned no content.");
+      }
+
+      htmlView.updateHTML(initialMarkup);
+    } catch (error) {
+      const fileName = path.basename(htmlDocument!.uri.fsPath);
+      const language = getLanguageLabel(fileName);
+      const message = error instanceof Error ? error.message : String(error);
+      output.appendLine(
+        `Failed to compile markup file '${fileName}' (language: ${language}): ${message}`
+      );
+      htmlView.showErrorOverlay(
+        `Failed to compile '${fileName}' (${language}). Check the DevSwing output for details.`
+      );
+      htmlView.updateHTML("");
+    }
+  } else {
+    htmlView.updateHTML(await getCanvasContent(uri, rootFiles));
+  }
+
+  if (!!stylesheetFile) {
+    try {
+      const initialStylesheet = await getStylesheetContent(cssDocument!);
+      if (initialStylesheet === null) {
+        throw new Error("Compiler returned no content.");
+      }
+
+      htmlView.updateCSS(initialStylesheet);
+    } catch (error) {
+      const fileName = path.basename(cssDocument!.uri.fsPath);
+      const language = getLanguageLabel(fileName);
+      const message = error instanceof Error ? error.message : String(error);
+      output.appendLine(
+        `Failed to compile stylesheet file '${fileName}' (language: ${language}): ${message}`
+      );
+      htmlView.showErrorOverlay(
+        `Failed to compile '${fileName}' (${language}). Check the DevSwing output for details.`
+      );
+      htmlView.updateCSS("");
+    }
+  } else {
+    htmlView.updateCSS("");
+  }
 
   if (jsDocument) {
-    htmlView.updateJavaScript(jsDocument!);
+    await htmlView.updateJavaScript(jsDocument!);
   }
 
   if (readmeFile) {

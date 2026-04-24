@@ -54,6 +54,10 @@ function getComponentType(extension: string): string | undefined {
   }
 }
 
+function escapeInlineScript(code: string) {
+  return code.replace(/<\/script>/gi, "<\\/script>");
+}
+
 export async function getMarkupContent(
   document: TextDocument
 ): Promise<string | null> {
@@ -63,45 +67,43 @@ export async function getMarkupContent(
   }
 
   const extension = path.extname(document.uri.path).toLocaleLowerCase();
-  try {
-    if (COMPONENT_EXTENSIONS.includes(extension)) {
-      const componentType = getComponentType(extension);
-      if (!componentType) {
-        return null;
-      }
-      const { compileComponent } = require(`./components/${componentType}`);
-      const [component, appInit, imports] = await compileComponent(
-        content,
-        document
-      );
-      const code = processImports(component);
-      return `<div id="app"></div>
-<script type="module">
-  ${imports &&
-    imports.map(
-      ([name, lib]: any) => `import ${name} from "${getModuleUrl(lib)}";\n`
-    )}
-  ${code}
-  ${appInit}
-</script>`;
-    } else if (extension === MARKUP_LANGUAGE.go) {
-      const { compileGo } = require("./go");
-      return await compileGo(content, document.uri);
+  if (COMPONENT_EXTENSIONS.includes(extension)) {
+    const componentType = getComponentType(extension);
+    if (!componentType) {
+      throw new Error(`Unsupported component extension '${extension}'.`);
     }
 
-    switch (extension) {
-      case MARKUP_LANGUAGE.pug:
-        const pug = require("pug");
-        return pug.render(content);
-      case MARKUP_LANGUAGE.markdown:
-        const markdown = require("markdown-it")();
-        return markdown.render(content, { html: true });
-      case MARKUP_LANGUAGE.html:
-        return content;
-      default:
-        return compileCode("markup", extension, content);
-    }
-  } catch {
-    return null;
+    const { compileComponent } = require(`./components/${componentType}`);
+    const [component, appInit, imports] = await compileComponent(content, document);
+    const code = escapeInlineScript(processImports(component));
+    const appInitialization = escapeInlineScript(appInit);
+    const importCode = imports
+      ? imports
+          .map(([name, lib]: any) => `import ${name} from "${getModuleUrl(lib)}";`)
+          .join("\n")
+      : "";
+
+    return `<div id="app"></div>
+<script type="module">
+  ${importCode}
+  ${code}
+  ${appInitialization}
+</script>`;
+  } else if (extension === MARKUP_LANGUAGE.go) {
+    const { compileGo } = require("./go");
+    return await compileGo(content, document.uri);
+  }
+
+  switch (extension) {
+    case MARKUP_LANGUAGE.pug:
+      const pug = require("pug");
+      return pug.render(content);
+    case MARKUP_LANGUAGE.markdown:
+      const markdown = require("markdown-it")();
+      return markdown.render(content, { html: true });
+    case MARKUP_LANGUAGE.html:
+      return content;
+    default:
+      return compileCode("markup", extension, content);
   }
 }

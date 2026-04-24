@@ -3,6 +3,7 @@ import { EXTENSION_NAME, LEGACY_COMMAND_PREFIX } from "./constants";
 
 const LEGACY_COMMANDS = [
   "addLibrary",
+  "browseRecentSwings",
   "addSwingFile",
   "changeLayout",
   "deleteSwingFile",

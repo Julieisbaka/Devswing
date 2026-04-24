@@ -1,9 +1,10 @@
 import * as vscode from "vscode";
 import { openSwing } from ".";
-import { refineSwingWithCopilot, generateSwingWithCopilot } from "../ai";
+import { generateSwingWithCopilot, refineSwingWithCopilot } from "../ai";
 import * as config from "../config";
 import { EXTENSION_NAME } from "../constants";
-import { store, SwingLibraryType, SwingFile } from "../store";
+import { storage as creationStorage, RecentSwing } from "../creation/storage";
+import { store, SwingFile, SwingLibraryType } from "../store";
 import { byteArrayToString, withProgress } from "../utils";
 import { SwingLayout } from "./layoutManager";
 import { addScriptModule, addSwingLibrary } from "./libraries";
@@ -12,7 +13,113 @@ function capitalizeFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+async function pathExists(path: string) {
+  try {
+    await vscode.workspace.fs.stat(vscode.Uri.file(path));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function formatLastOpened(lastOpened: number) {
+  return new Date(lastOpened).toLocaleString();
+}
+
+async function browseRecentSwings() {
+  const mru = creationStorage.getRecentTempSwings();
+  if (mru.length === 0) {
+    vscode.window.showInformationMessage("No recent temporary swings yet.");
+    return;
+  }
+
+  const existing: RecentSwing[] = [];
+  for (const swing of mru) {
+    if (await pathExists(swing.path)) {
+      existing.push(swing);
+    } else {
+      await creationStorage.removeRecentTempSwing(swing.path);
+    }
+  }
+
+  if (existing.length === 0) {
+    vscode.window.showInformationMessage(
+      "No recent temporary swings were found on disk."
+    );
+    return;
+  }
+
+  const selected = await vscode.window.showQuickPick(
+    existing.map((entry) => ({
+      label: vscode.workspace.asRelativePath(entry.path, false),
+      description: formatLastOpened(entry.lastOpened),
+      detail: entry.path,
+      entry,
+    })),
+    {
+      placeHolder: "Select a recent swing",
+      title: "Browse Recent Swings",
+    }
+  );
+
+  if (!selected) {
+    return;
+  }
+
+  const action = await vscode.window.showQuickPick(
+    [
+      { label: "Open", action: "open" as const },
+      { label: "Reveal in File Explorer", action: "reveal" as const },
+      { label: "Delete", action: "delete" as const },
+    ],
+    {
+      placeHolder: `Action for ${selected.detail}`,
+    }
+  );
+
+  if (!action) {
+    return;
+  }
+
+  const swingUri = vscode.Uri.file(selected.entry.path);
+  switch (action.action) {
+    case "open":
+      await openSwing(swingUri);
+      break;
+    case "reveal":
+      await vscode.commands.executeCommand("revealFileInOS", swingUri);
+      break;
+    case "delete": {
+      const confirmation = await vscode.window.showWarningMessage(
+        `Delete swing folder '${selected.entry.path}'?`,
+        { modal: true },
+        "Delete"
+      );
+      if (confirmation !== "Delete") {
+        return;
+      }
+
+      await vscode.workspace.fs.delete(swingUri, { recursive: true, useTrash: true });
+      await creationStorage.removeRecentTempSwing(selected.entry.path);
+
+      if (store.activeSwing?.rootUri.fsPath === selected.entry.path) {
+        store.activeSwing.webViewPanel.dispose();
+      }
+
+      vscode.window.showInformationMessage("Temporary swing deleted.");
+      break;
+    }
+  }
+}
+
 export async function registerSwingCommands(context: vscode.ExtensionContext) {
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      `${EXTENSION_NAME}.browseRecentSwings`,
+      browseRecentSwings
+    )
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand(
       `${EXTENSION_NAME}.addLibrary`,

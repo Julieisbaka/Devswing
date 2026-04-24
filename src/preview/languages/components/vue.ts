@@ -14,18 +14,26 @@ export function compileComponent(content: string): [string, string, [string, str
     throw new Error(errors[0].message);
   }
 
+  if (!descriptor.template) {
+    throw new Error("Vue component is missing a <template> block.");
+  }
+
   const id = "devswing-vue";
 
   const scriptResult = compileScript(descriptor, { id });
 
   const templateResult = compileTemplate({
-    source: descriptor.template?.content ?? "",
+    source: descriptor.template.content,
     filename: COMPONENT_NAME,
     id,
     compilerOptions: {
       bindingMetadata: scriptResult.bindings,
     },
   });
+
+  if (templateResult.errors.length > 0) {
+    throw new Error(String(templateResult.errors[0]));
+  }
 
   const componentCode = `
 ${scriptResult.content}

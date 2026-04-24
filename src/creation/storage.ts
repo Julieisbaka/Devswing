@@ -1,14 +1,27 @@
-import { commands, ExtensionContext } from "vscode";
+import { commands, ExtensionContext, Uri } from "vscode";
 import { EXTENSION_NAME } from "../constants";
+import { store } from "../store";
 
-const MRU_SIZE = 3;
+const TEMPLATE_MRU_SIZE = 3;
+const SWING_MRU_SIZE = 20;
 
-const MRU_CONTEXT_KEY = `${EXTENSION_NAME}:hasTemplateMRU`;
-const MRU_STORAGE_KEY = `${EXTENSION_NAME}:templateMRU`;
+const TEMPLATE_MRU_CONTEXT_KEY = `${EXTENSION_NAME}:hasTemplateMRU`;
+const TEMPLATE_MRU_STORAGE_KEY = `${EXTENSION_NAME}:templateMRU`;
+
+const RECENT_SWINGS_CONTEXT_KEY = `${EXTENSION_NAME}:hasRecentTempSwings`;
+const RECENT_SWINGS_STORAGE_KEY = `${EXTENSION_NAME}:recentTempSwings`;
+
+export interface RecentSwing {
+  path: string;
+  lastOpened: number;
+}
 
 export interface IStorage {
   getTemplateMRU(): string[];
   addTemplateToMRU(template: string): Promise<void>;
+  getRecentTempSwings(): RecentSwing[];
+  addRecentTempSwing(uri: Uri): Promise<void>;
+  removeRecentTempSwing(path: string): Promise<void>;
 }
 
 export let storage: IStorage;
@@ -18,7 +31,7 @@ export async function initializeStorage(
 ) {
   storage = {
     getTemplateMRU(): string[] {
-      const mru = context.globalState.get<string[]>(MRU_STORAGE_KEY) || [];
+      const mru = context.globalState.get<string[]>(TEMPLATE_MRU_STORAGE_KEY) || [];
       return mru.filter((template) => template !== null);
     },
     async addTemplateToMRU(template: string) {
@@ -30,18 +43,71 @@ export async function initializeStorage(
 
       mru.unshift(template);
 
-      while (mru.length > MRU_SIZE) {
+      while (mru.length > TEMPLATE_MRU_SIZE) {
         mru.pop();
       }
 
-      await context.globalState.update(MRU_STORAGE_KEY, mru);
-      await commands.executeCommand("setContext", MRU_CONTEXT_KEY, true);
+      await context.globalState.update(TEMPLATE_MRU_STORAGE_KEY, mru);
+      await commands.executeCommand("setContext", TEMPLATE_MRU_CONTEXT_KEY, true);
+    },
+    getRecentTempSwings(): RecentSwing[] {
+      const swings =
+        context.globalState.get<RecentSwing[]>(RECENT_SWINGS_STORAGE_KEY) || [];
+
+      return swings
+        .filter((entry) => !!entry?.path)
+        .sort((a, b) => b.lastOpened - a.lastOpened);
+    },
+    async addRecentTempSwing(uri: Uri) {
+      const tempRoot = store.globalStorageUri;
+      if (!tempRoot) {
+        return;
+      }
+
+      const normalizedRoot = tempRoot.path.toLocaleLowerCase();
+      const normalizedPath = uri.path.toLocaleLowerCase();
+      if (!normalizedPath.startsWith(normalizedRoot)) {
+        return;
+      }
+
+      const swings = this.getRecentTempSwings();
+      const nextSwings = swings.filter((entry) => entry.path !== uri.fsPath);
+      nextSwings.unshift({
+        path: uri.fsPath,
+        lastOpened: Date.now(),
+      });
+
+      while (nextSwings.length > SWING_MRU_SIZE) {
+        nextSwings.pop();
+      }
+
+      await context.globalState.update(RECENT_SWINGS_STORAGE_KEY, nextSwings);
+      await commands.executeCommand(
+        "setContext",
+        RECENT_SWINGS_CONTEXT_KEY,
+        nextSwings.length > 0
+      );
+    },
+    async removeRecentTempSwing(path: string) {
+      const swings = this.getRecentTempSwings();
+      const nextSwings = swings.filter((entry) => entry.path !== path);
+      await context.globalState.update(RECENT_SWINGS_STORAGE_KEY, nextSwings);
+      await commands.executeCommand(
+        "setContext",
+        RECENT_SWINGS_CONTEXT_KEY,
+        nextSwings.length > 0
+      );
     },
   };
 
   if (storage.getTemplateMRU().length > 0) {
-    await commands.executeCommand("setContext", MRU_CONTEXT_KEY, true);
+    await commands.executeCommand("setContext", TEMPLATE_MRU_CONTEXT_KEY, true);
   }
 
-  syncKeys.push(MRU_STORAGE_KEY);
+  if (storage.getRecentTempSwings().length > 0) {
+    await commands.executeCommand("setContext", RECENT_SWINGS_CONTEXT_KEY, true);
+  }
+
+  syncKeys.push(TEMPLATE_MRU_STORAGE_KEY);
+  syncKeys.push(RECENT_SWINGS_STORAGE_KEY);
 }

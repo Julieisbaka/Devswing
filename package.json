@@ -23,6 +23,7 @@
     "workspaceContains:devswing.json",
     "workspaceContains:codeswing.json",
     "onCommand:codeswing.addLibrary",
+    "onCommand:codeswing.browseRecentSwings",
     "onCommand:codeswing.addSwingFile",
     "onCommand:codeswing.changeLayout",
     "onCommand:codeswing.deleteSwingFile",
@@ -57,6 +58,12 @@
         "title": "Add Library",
         "category": "DevSwing",
         "icon": "$(library)"
+      },
+      {
+        "command": "devswing.browseRecentSwings",
+        "title": "Browse Recent Swings",
+        "category": "DevSwing",
+        "icon": "$(history)"
       },
       {
         "command": "devswing.addSwingFile",
@@ -216,6 +223,9 @@
         {
           "command": "devswing.newSwingFromLastTemplate",
           "when": "devswing:hasTemplateMRU"
+        },
+        {
+          "command": "devswing.browseRecentSwings"
         },
         {
           "command": "devswing.openDeveloperTools",
@@ -404,6 +414,14 @@
           "type": "string",
           "description": "Specifies the directory to create swings in within the open workspace."
         },
+        "devswing.tempRootDirectory": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Specifies the directory to create temporary swings in. Relative paths are resolved from the first workspace folder; absolute paths are used as-is."
+        },
         "devswing.showConsole": {
           "default": false,
           "type": "boolean",
@@ -446,6 +464,11 @@
           "maximum": 5000,
           "description": "Specifies the delay (in milliseconds) before updating the preview after code changes. Increase for better performance with large swings."
         },
+        "devswing.loopProtection": {
+          "default": true,
+          "type": "boolean",
+          "description": "Specifies whether to instrument script code with loop-protection guards to stop runaway infinite loops in preview."
+        },
         "devswing.aiSystemPrompt": {
           "default": "",
           "type": "string",
@@ -483,19 +506,19 @@
     "devswing.templateGalleries": [
       {
         "id": "web:basic",
-        "url": "https://cdn.jsdelivr.net/gh/Julieisbaka/Devswing@main/templates/basic.json"
+        "url": "https://raw.githubusercontent.com/Julieisbaka/Devswing/main/templates/basic.json"
       },
       {
         "id": "web:languages",
-        "url": "https://cdn.jsdelivr.net/gh/Julieisbaka/Devswing@main/templates/languages.json"
+        "url": "https://raw.githubusercontent.com/Julieisbaka/Devswing/main/templates/languages.json"
       },
       {
         "id": "web:components",
-        "url": "https://cdn.jsdelivr.net/gh/Julieisbaka/Devswing@main/templates/components.json"
+        "url": "https://raw.githubusercontent.com/Julieisbaka/Devswing/main/templates/components.json"
       },
       {
         "id": "go",
-        "url": "https://cdn.jsdelivr.net/gh/Julieisbaka/Devswing@main/templates/go.json"
+        "url": "https://raw.githubusercontent.com/Julieisbaka/Devswing/main/templates/go.json"
       }
     ]
   },
@@ -508,7 +531,6 @@
   },
   "devDependencies": {
     "@types/debounce": "^1.2.0",
-    "@types/glob": "^7.1.3",
     "@types/node": "^20.0.0",
     "@types/sass": "^1.16.1",
     "@types/vscode": "^1.85.0",

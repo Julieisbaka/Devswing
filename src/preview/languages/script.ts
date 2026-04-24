@@ -1,5 +1,6 @@
 import * as path from "path";
 import { TextDocument } from "vscode";
+import * as config from "../../config";
 import { SwingManifest } from "../../store";
 import { processImports } from "../libraries/skypack";
 
@@ -29,6 +30,54 @@ export const SCRIPT_EXTENSIONS = [
   ...MODULE_EXTENSIONS,
   ...TYPESCRIPT_EXTENSIONS,
 ];
+
+export function getScriptLanguageLabel(extension: string) {
+  switch (extension) {
+    case SCRIPT_LANGUAGE.babel:
+      return "babel";
+    case SCRIPT_LANGUAGE.javascript:
+      return "javascript";
+    case SCRIPT_LANGUAGE.javascriptmodule:
+      return "javascript module";
+    case SCRIPT_LANGUAGE.javascriptreact:
+      return "react jsx";
+    case SCRIPT_LANGUAGE.typescript:
+      return "typescript";
+    case SCRIPT_LANGUAGE.typescriptreact:
+      return "react tsx";
+    default:
+      return extension.slice(1) || "script";
+  }
+}
+
+function applyLoopProtection(content: string) {
+  const guardName = "__devSwingLoopProtect";
+  const guardCode = `
+const ${guardName} = (() => {
+  const start = Date.now();
+  const maxDurationMs = 2000;
+  return () => {
+    if (Date.now() - start > maxDurationMs) {
+      throw new Error("Possible runaway loop detected. Stop execution, fix the loop condition, and run again.");
+    }
+  };
+})();
+`;
+
+  const injectGuard = (source: string, pattern: RegExp) =>
+    source.replace(pattern, (match) => `${match}${guardName}();`);
+
+  let transformed = content;
+  transformed = injectGuard(transformed, /for\s*\([^)]*\)\s*\{/g);
+  transformed = injectGuard(transformed, /while\s*\([^)]*\)\s*\{/g);
+  transformed = injectGuard(transformed, /do\s*\{/g);
+
+  if (transformed === content) {
+    return content;
+  }
+
+  return `${guardCode}\n${transformed}`;
+}
 
 export function isReactFile(fileName: string) {
   return REACT_EXTENSIONS.includes(path.extname(fileName));
@@ -102,6 +151,8 @@ export function compileScriptContent(
   const containsJsx =
     includesJsx || content.match(/import .* from (["'])react\1/) !== null;
 
+  let compiledContent: string;
+
   if (TYPESCRIPT_EXTENSIONS.includes(extension) || containsJsx) {
     const typescript = require("typescript");
     const compilerOptions: any = {
@@ -114,13 +165,17 @@ export function compileScriptContent(
     }
 
     try {
-      return typescript.transpile(content, compilerOptions);
+      compiledContent = typescript.transpile(content, compilerOptions);
     } catch (e) {
       // Something failed when trying to transpile Pug,
       // so don't attempt to return anything
       return null;
     }
   } else {
-    return content;
+    compiledContent = content;
   }
+
+  return config.get("loopProtection")
+    ? applyLoopProtection(compiledContent)
+    : compiledContent;
 }
