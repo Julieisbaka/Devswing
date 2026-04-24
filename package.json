@@ -549,7 +549,7 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
-    "glob": "^10.3.10",
+    "glob": "^13.0.6",
     "markdown-it": "^14.0.0",
     "raw-loader": "^4.0.2",
     "ts-loader": "^9.5.1",
