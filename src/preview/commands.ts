@@ -5,7 +5,7 @@ import * as config from "../config";
 import { EXTENSION_NAME } from "../constants";
 import { storage as creationStorage, RecentSwing } from "../creation/storage";
 import { store, SwingFile, SwingLibraryType } from "../store";
-import { byteArrayToString, withProgress } from "../utils";
+import { byteArrayToString, checkForSwingWorkspace, withProgress } from "../utils";
 import { SwingLayout } from "./layoutManager";
 import { addScriptModule, addSwingLibrary } from "./libraries";
 
@@ -26,6 +26,14 @@ function formatLastOpened(lastOpened: number) {
   return new Date(lastOpened).toLocaleString();
 }
 
+type RecentSwingPick = {
+  label: string;
+  description?: string;
+  detail?: string;
+  entry?: RecentSwing;
+  action?: "clearMissing";
+};
+
 async function browseRecentSwings() {
   const mru = creationStorage.getRecentTempSwings();
   if (mru.length === 0) {
@@ -33,29 +41,24 @@ async function browseRecentSwings() {
     return;
   }
 
-  const existing: RecentSwing[] = [];
-  for (const swing of mru) {
-    if (await pathExists(swing.path)) {
-      existing.push(swing);
-    } else {
-      await creationStorage.removeRecentTempSwing(swing.path);
-    }
-  }
+  void creationStorage.cleanupMissingRecentTempSwings();
 
-  if (existing.length === 0) {
-    vscode.window.showInformationMessage(
-      "No recent temporary swings were found on disk."
-    );
-    return;
-  }
-
-  const selected = await vscode.window.showQuickPick(
-    existing.map((entry) => ({
+  const recentSwingItems: RecentSwingPick[] = [
+    {
+      label: "$(clear-all) Clear Missing Swings",
+      description: "Remove deleted temporary swings from this list",
+      action: "clearMissing",
+    },
+    ...mru.map((entry) => ({
       label: vscode.workspace.asRelativePath(entry.path, false),
       description: formatLastOpened(entry.lastOpened),
       detail: entry.path,
       entry,
     })),
+  ];
+
+  const selected = await vscode.window.showQuickPick(
+    recentSwingItems,
     {
       placeHolder: "Select a recent swing",
       title: "Browse Recent Swings",
@@ -66,6 +69,30 @@ async function browseRecentSwings() {
     return;
   }
 
+  if (selected.action === "clearMissing") {
+    const removed = await creationStorage.cleanupMissingRecentTempSwings();
+    vscode.window.showInformationMessage(
+      removed === 0
+        ? "No missing temporary swings were found."
+        : `Removed ${removed} missing temporary swing${removed === 1 ? "" : "s"}.`
+    );
+    return;
+  }
+
+  if (!selected.entry) {
+    return;
+  }
+
+  const selectedEntry = selected.entry;
+
+  if (!(await pathExists(selectedEntry.path))) {
+    await creationStorage.removeRecentTempSwing(selectedEntry.path);
+    vscode.window.showWarningMessage(
+      "That temporary swing no longer exists, so it was removed from the recent list."
+    );
+    return;
+  }
+
   const action = await vscode.window.showQuickPick(
     [
       { label: "Open", action: "open" as const },
@@ -73,7 +100,7 @@ async function browseRecentSwings() {
       { label: "Delete", action: "delete" as const },
     ],
     {
-      placeHolder: `Action for ${selected.detail}`,
+      placeHolder: `Action for ${selectedEntry.path}`,
     }
   );
 
@@ -81,7 +108,7 @@ async function browseRecentSwings() {
     return;
   }
 
-  const swingUri = vscode.Uri.file(selected.entry.path);
+  const swingUri = vscode.Uri.file(selectedEntry.path);
   switch (action.action) {
     case "open":
       await openSwing(swingUri);
@@ -91,7 +118,7 @@ async function browseRecentSwings() {
       break;
     case "delete": {
       const confirmation = await vscode.window.showWarningMessage(
-        `Delete swing folder '${selected.entry.path}'?`,
+        `Delete swing folder '${selectedEntry.path}'?`,
         { modal: true },
         "Delete"
       );
@@ -100,10 +127,11 @@ async function browseRecentSwings() {
       }
 
       await vscode.workspace.fs.delete(swingUri, { recursive: true, useTrash: true });
-      await creationStorage.removeRecentTempSwing(selected.entry.path);
+      await creationStorage.removeRecentTempSwing(selectedEntry.path);
 
-      if (store.activeSwing?.rootUri.fsPath === selected.entry.path) {
-        store.activeSwing.webViewPanel.dispose();
+      const activeSwing = store.activeSwing;
+      if (activeSwing?.rootUri.fsPath === selectedEntry.path) {
+        activeSwing.webViewPanel.dispose();
       }
 
       vscode.window.showInformationMessage("Temporary swing deleted.");
@@ -304,7 +332,7 @@ export async function registerSwingCommands(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       `${EXTENSION_NAME}.openWorkspaceSwing`,
       () => {
-        openSwing(vscode.workspace.workspaceFolders![0].uri);
+        checkForSwingWorkspace({ initializeIfMissing: false });
       }
     )
   );

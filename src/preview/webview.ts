@@ -13,6 +13,12 @@ import { storage } from "./tutorials/storage";
 
 const EXIT_RESPONSE = "Exit Swing";
 
+export interface SwingWebViewUpdates {
+  css?: string;
+  input?: string;
+  errorOverlay?: string | null;
+}
+
 export class SwingWebView {
   private css: string = "";
   private html: string = "";
@@ -238,7 +244,7 @@ export class SwingWebView {
     this.css = css;
 
     if (rebuild) {
-      this.webview.postMessage({ command: "updateCSS", value: css });
+      this.applyUpdates({ css });
     }
   }
 
@@ -246,8 +252,20 @@ export class SwingWebView {
     this.input = input;
 
     if (rebuild) {
-      this.webview.postMessage({ command: "updateInput", value: input });
+      this.applyUpdates({ input });
     }
+  }
+
+  public applyUpdates(updates: SwingWebViewUpdates) {
+    if (updates.css !== undefined) {
+      this.css = updates.css;
+    }
+
+    if (updates.input !== undefined) {
+      this.input = updates.input;
+    }
+
+    this.webview.postMessage({ command: "batchUpdate", value: updates });
   }
 
   public async updateReadme(readme: string, rebuild = false) {
@@ -277,7 +295,7 @@ export class SwingWebView {
   public async updateJavaScript(
     textDocument: vscode.TextDocument,
     rebuild = false
-  ) {
+  ): Promise<boolean> {
     const data = getScriptContent(textDocument, this.manifest);
     if (data === null) {
       const fileName = path.basename(textDocument.uri.fsPath);
@@ -289,7 +307,7 @@ export class SwingWebView {
       this.showErrorOverlay(
         `Failed to compile '${fileName}' (${language}). Check the DevSwing output for details.`
       );
-      return;
+      return false;
     }
 
     this.javascript = data[0];
@@ -299,6 +317,8 @@ export class SwingWebView {
     if (rebuild) {
       await this.rebuildWebview();
     }
+
+    return true;
   }
 
   public async updateManifest(manifest: string, rebuild = false) {
@@ -318,11 +338,11 @@ export class SwingWebView {
   }
 
   public showErrorOverlay(message: string) {
-    this.webview.postMessage({ command: "showErrorOverlay", value: message });
+    this.applyUpdates({ errorOverlay: message });
   }
 
   public hideErrorOverlay() {
-    this.webview.postMessage({ command: "hideErrorOverlay" });
+    this.applyUpdates({ errorOverlay: null });
   }
 
   private async resolveLibraries(libraryType: SwingLibraryType) {
@@ -628,7 +648,9 @@ export class SwingWebView {
       }
 
       window.addEventListener("message", ({ data }) => {  
-        if (data.command === "updateCSS") {
+        if (data.command === "batchUpdate") {
+          applyBatchUpdate(data.value || {});
+        } else if (data.command === "updateCSS") {
           style.textContent = data.value;
         } else if (data.command === "httpResponse") {
           const id = data.value.id;
@@ -659,6 +681,24 @@ export class SwingWebView {
           hideErrorOverlay();
         }
       });
+
+      function applyBatchUpdate(value) {
+        if (Object.prototype.hasOwnProperty.call(value, "css")) {
+          style.textContent = value.css || "";
+        }
+
+        if (Object.prototype.hasOwnProperty.call(value, "input")) {
+          triggerInput(value.input || "");
+        }
+
+        if (Object.prototype.hasOwnProperty.call(value, "errorOverlay")) {
+          if (value.errorOverlay) {
+            showErrorOverlay(value.errorOverlay);
+          } else {
+            hideErrorOverlay();
+          }
+        }
+      }
 
       function showErrorOverlay(message) {
         const overlay = document.getElementById("devswing-error-overlay");

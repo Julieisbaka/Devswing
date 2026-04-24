@@ -1,4 +1,4 @@
-import { commands, ExtensionContext, Uri } from "vscode";
+import { commands, ExtensionContext, Uri, workspace } from "vscode";
 import { EXTENSION_NAME } from "../constants";
 import { store } from "../store";
 
@@ -22,6 +22,16 @@ export interface IStorage {
   getRecentTempSwings(): RecentSwing[];
   addRecentTempSwing(uri: Uri): Promise<void>;
   removeRecentTempSwing(path: string): Promise<void>;
+  cleanupMissingRecentTempSwings(): Promise<number>;
+}
+
+async function pathExists(path: string) {
+  try {
+    await workspace.fs.stat(Uri.file(path));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export let storage: IStorage;
@@ -97,6 +107,28 @@ export async function initializeStorage(
         RECENT_SWINGS_CONTEXT_KEY,
         nextSwings.length > 0
       );
+    },
+    async cleanupMissingRecentTempSwings() {
+      const swings = this.getRecentTempSwings();
+      const existing: RecentSwing[] = [];
+
+      for (const swing of swings) {
+        if (await pathExists(swing.path)) {
+          existing.push(swing);
+        }
+      }
+
+      const removed = swings.length - existing.length;
+      if (removed > 0) {
+        await context.globalState.update(RECENT_SWINGS_STORAGE_KEY, existing);
+        await commands.executeCommand(
+          "setContext",
+          RECENT_SWINGS_CONTEXT_KEY,
+          existing.length > 0
+        );
+      }
+
+      return removed;
     },
   };
 

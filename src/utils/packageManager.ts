@@ -1,6 +1,29 @@
 import * as vscode from "vscode";
 import { SwingManifest } from "../store";
 
+const DEFAULT_PROMPT_THROTTLE = 30 * 1000;
+
+interface PromptHistory {
+  ignoredPackages: Set<string>;
+  lastPromptAt: number;
+  lastSignature: string;
+}
+
+interface PromptOptions {
+  manifestUri?: vscode.Uri;
+  throttleMs?: number;
+}
+
+const promptHistories = new Map<string, PromptHistory>();
+
+function getPromptHistoryKey(options?: PromptOptions) {
+  return options?.manifestUri?.toString() || "global";
+}
+
+function getPackageSignature(packages: string[]) {
+  return [...packages].sort((a, b) => a.localeCompare(b)).join("|");
+}
+
 /**
  * Extracts import/require statements from JavaScript/TypeScript code
  */
@@ -94,16 +117,45 @@ export function findMissingPackages(
  */
 export async function promptToInstallMissingPackages(
   missingPackages: string[],
-  onInstall: (packages: string[]) => Promise<void>
+  onInstall: (packages: string[]) => Promise<void>,
+  options?: PromptOptions
 ): Promise<boolean> {
   if (missingPackages.length === 0) {
     return false;
   }
 
+  const historyKey = getPromptHistoryKey(options);
+  const history = promptHistories.get(historyKey) || {
+    ignoredPackages: new Set<string>(),
+    lastPromptAt: 0,
+    lastSignature: "",
+  };
+  const throttleMs = options?.throttleMs ?? DEFAULT_PROMPT_THROTTLE;
+  const signature = getPackageSignature(missingPackages);
+  const now = Date.now();
+  const nextPackages = missingPackages.filter(
+    (pkg) => !history.ignoredPackages.has(pkg)
+  );
+
+  if (nextPackages.length === 0) {
+    return false;
+  }
+
+  if (
+    signature === history.lastSignature &&
+    now - history.lastPromptAt < throttleMs
+  ) {
+    return false;
+  }
+
   const message =
-    missingPackages.length === 1
-      ? `The package "${missingPackages[0]}" is imported but not in your manifest. Add it?`
-      : `These packages are imported but not in your manifest:\n\n${missingPackages.map((p) => `• ${p}`).join('\n')}\n\nAdd them?`;
+    nextPackages.length === 1
+      ? `The package "${nextPackages[0]}" is imported but not in your manifest. Add it?`
+      : `These packages are imported but not in your manifest:\n\n${nextPackages.map((p) => `• ${p}`).join('\n')}\n\nAdd them?`;
+
+  history.lastPromptAt = now;
+  history.lastSignature = signature;
+  promptHistories.set(historyKey, history);
 
   const result = await vscode.window.showInformationMessage(
     message,
@@ -113,8 +165,15 @@ export async function promptToInstallMissingPackages(
   );
 
   if (result === "Add Packages") {
-    await onInstall(missingPackages);
+    await onInstall(nextPackages);
     return true;
+  }
+
+  if (result === "Ignore") {
+    for (const pkg of nextPackages) {
+      history.ignoredPackages.add(pkg);
+    }
+    promptHistories.set(historyKey, history);
   }
 
   return false;

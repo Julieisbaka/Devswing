@@ -39,7 +39,7 @@ import {
   getStylesheetContent,
 } from "./languages/stylesheet";
 import { createLayoutManager } from "./layoutManager";
-import { getCdnJsLibraries } from "./libraries/cdnjs";
+import { getCdnJsLibraries, initializeCdnJsCache } from "./libraries/cdnjs";
 import {
   ProxyFileSystemProvider,
   registerProxyFileSystemProvider,
@@ -53,7 +53,7 @@ import {
 } from "./tour";
 import { registerTutorialModule } from "./tutorials";
 import { storage } from "./tutorials/storage";
-import { SwingWebView } from "./webview";
+import { SwingWebView, SwingWebViewUpdates } from "./webview";
 import debounce = require("debounce");
 
 const CONFIG_FILE = "config.json";
@@ -320,9 +320,9 @@ export async function openSwing(uri: Uri) {
     store.activeSwing.webViewPanel.dispose();
   }
 
-  const isWorkspaceSwing =
-    vscode.workspace.workspaceFolders &&
-    uri.toString() === vscode.workspace.workspaceFolders[0].uri.toString();
+  const isWorkspaceSwing = !!vscode.workspace.workspaceFolders?.some(
+    (folder) => uri.toString() === folder.uri.toString()
+  );
 
   await vscode.commands.executeCommand(
     "setContext",
@@ -526,56 +526,142 @@ export async function openSwing(uri: Uri) {
     }
   }
 
-  const documentChangeDisposable = vscode.workspace.onDidChangeTextDocument(
-    debounce(async ({ document }) => {
-      if (isSwingDocumentOfType(document, SwingFileType.markup)) {
-        try {
-          const content = await getMarkupContent(document);
-          if (content !== null) {
-            htmlView.updateHTML(content, runOnEdit);
-          } else {
-            throw new Error("Compiler returned no content.");
+  const pendingDocuments = new Map<string, vscode.TextDocument>();
+  let pendingDocumentTimer: ReturnType<typeof setTimeout> | undefined;
+  let isFlushingPendingDocuments = false;
+
+  function hasIncrementalUpdates(updates: SwingWebViewUpdates) {
+    return Object.keys(updates).length > 0;
+  }
+
+  function getDocumentUpdatePriority(document: vscode.TextDocument) {
+    if (isSwingDocumentOfType(document, SwingFileType.manifest)) {
+      return 0;
+    }
+
+    if (isSwingDocumentOfType(document, SwingFileType.markup)) {
+      return 1;
+    }
+
+    if (isSwingDocumentOfType(document, SwingFileType.stylesheet)) {
+      return 2;
+    }
+
+    if (isSwingDocumentOfType(document, SwingFileType.script)) {
+      return 3;
+    }
+
+    if (isSwingDocumentOfType(document, SwingFileType.readme)) {
+      return 4;
+    }
+
+    if (isSwingDocumentOfType(document, SwingFileType.config)) {
+      return 5;
+    }
+
+    if (document.uri.scheme === INPUT_SCHEME) {
+      return 6;
+    }
+
+    return 7;
+  }
+
+  function schedulePendingDocumentFlush(delay = config.get("hotReloadDelay")) {
+    if (pendingDocumentTimer) {
+      clearTimeout(pendingDocumentTimer);
+    }
+
+    const normalizedDelay = Math.max(0, delay || 0);
+    if (normalizedDelay === 0) {
+      pendingDocumentTimer = undefined;
+      void flushPendingDocuments();
+      return;
+    }
+
+    pendingDocumentTimer = setTimeout(() => {
+      pendingDocumentTimer = undefined;
+      void flushPendingDocuments();
+    }, normalizedDelay);
+  }
+
+  function queueDocumentChange(document: vscode.TextDocument) {
+    const isInputDocument = document.uri.scheme === INPUT_SCHEME;
+    if (!isInputDocument && !isSwingDocument(document.uri)) {
+      return;
+    }
+
+    pendingDocuments.set(document.uri.toString(), document);
+    schedulePendingDocumentFlush();
+  }
+
+  async function flushPendingDocuments() {
+    if (isFlushingPendingDocuments) {
+      return;
+    }
+
+    isFlushingPendingDocuments = true;
+    try {
+      const documents = [...pendingDocuments.values()].sort(
+        (a, b) => getDocumentUpdatePriority(a) - getDocumentUpdatePriority(b)
+      );
+      pendingDocuments.clear();
+
+      let needsFullRebuild = false;
+      const incrementalUpdates: SwingWebViewUpdates = {};
+
+      for (const document of documents) {
+        if (isSwingDocumentOfType(document, SwingFileType.markup)) {
+          try {
+            const content = await getMarkupContent(document);
+            if (content !== null) {
+              await htmlView.updateHTML(content, false);
+              needsFullRebuild = needsFullRebuild || runOnEdit;
+            } else {
+              throw new Error("Compiler returned no content.");
+            }
+          } catch (error) {
+            const fileName = path.basename(document.uri.fsPath);
+            const language = getLanguageLabel(fileName);
+            const message =
+              error instanceof Error ? error.message : String(error);
+            output.appendLine(
+              `Failed to compile markup file '${fileName}' (language: ${language}): ${message}`
+            );
+            htmlView.showErrorOverlay(
+              `Failed to compile '${fileName}' (${language}). Check the DevSwing output for details.`
+            );
           }
-        } catch (error) {
-          const fileName = path.basename(document.uri.fsPath);
-          const language = getLanguageLabel(fileName);
-          const message =
-            error instanceof Error ? error.message : String(error);
-          output.appendLine(
-            `Failed to compile markup file '${fileName}' (language: ${language}): ${message}`
-          );
-          htmlView.showErrorOverlay(
-            `Failed to compile '${fileName}' (${language}). Check the DevSwing output for details.`
-          );
-        }
-      } else if (isSwingDocumentOfType(document, SwingFileType.script)) {
-        // If the user renamed the script file (e.g. from *.js to *.jsx)
-        // then we need to update the manifest in case new scripts
-        // need to be injected into the webview (e.g. "react").
-        if (
-          jsDocument &&
-          jsDocument.uri.toString() !== document.uri.toString()
-        ) {
-          files = updateFilesForRenamedScript(files, jsDocument.uri, document.uri);
+        } else if (isSwingDocumentOfType(document, SwingFileType.script)) {
+          // If the user renamed the script file (e.g. from *.js to *.jsx)
+          // then we need to update the manifest in case new scripts
+          // need to be injected into the webview (e.g. "react").
+          if (
+            jsDocument &&
+            jsDocument.uri.toString() !== document.uri.toString()
+          ) {
+            files = updateFilesForRenamedScript(files, jsDocument.uri, document.uri);
 
-          htmlView.updateManifest(
-            await getManifestContent(currentUri, files),
-            runOnEdit
-          );
-        }
+            await htmlView.updateManifest(
+              await getManifestContent(currentUri, files),
+              false
+            );
+            needsFullRebuild = needsFullRebuild || runOnEdit;
+          }
 
-        await htmlView.updateJavaScript(document, runOnEdit);
-      } else if (isSwingDocumentOfType(document, SwingFileType.manifest)) {
-        htmlView.updateManifest(document.getText(), runOnEdit);
-
-        if (jsDocument) {
+          if (await htmlView.updateJavaScript(document, false)) {
+            needsFullRebuild = needsFullRebuild || runOnEdit;
+          }
+        } else if (isSwingDocumentOfType(document, SwingFileType.manifest)) {
           let newManifest: SwingManifest;
           try {
             newManifest = JSON.parse(document.getText());
           } catch {
-            // Skip expensive JS updates while the manifest is temporarily invalid JSON.
-            return;
+            // Skip expensive updates while the manifest is temporarily invalid JSON.
+            await htmlView.updateManifest(document.getText(), false);
+            continue;
           }
+
+          await htmlView.updateManifest(document.getText(), false);
 
           const scriptsChanged = hasArrayChanged(
             manifest.scripts || [],
@@ -587,43 +673,71 @@ export async function openSwing(uri: Uri) {
           );
 
           manifest = newManifest;
+          needsFullRebuild = needsFullRebuild || runOnEdit;
 
           // Only update JS if the manifest change actually impacts it
-          if (scriptsChanged || stylesChanged) {
-            htmlView.updateJavaScript(jsDocument, runOnEdit);
+          if (jsDocument && (scriptsChanged || stylesChanged)) {
+            if (await htmlView.updateJavaScript(jsDocument, false)) {
+              needsFullRebuild = needsFullRebuild || runOnEdit;
+            }
           }
-        }
-      } else if (isSwingDocumentOfType(document, SwingFileType.stylesheet)) {
-        try {
-          const content = await getStylesheetContent(document);
-          if (content !== null) {
-            htmlView.updateCSS(content, runOnEdit);
-          } else {
-            throw new Error("Compiler returned no content.");
+        } else if (isSwingDocumentOfType(document, SwingFileType.stylesheet)) {
+          try {
+            const content = await getStylesheetContent(document);
+            if (content !== null) {
+              htmlView.updateCSS(content, false);
+              if (runOnEdit) {
+                incrementalUpdates.css = content;
+              }
+            } else {
+              throw new Error("Compiler returned no content.");
+            }
+          } catch (error) {
+            const fileName = path.basename(document.uri.fsPath);
+            const language = getLanguageLabel(fileName);
+            const message =
+              error instanceof Error ? error.message : String(error);
+            output.appendLine(
+              `Failed to compile stylesheet file '${fileName}' (language: ${language}): ${message}`
+            );
+            htmlView.showErrorOverlay(
+              `Failed to compile '${fileName}' (${language}). Check the DevSwing output for details.`
+            );
           }
-        } catch (error) {
-          const fileName = path.basename(document.uri.fsPath);
-          const language = getLanguageLabel(fileName);
-          const message =
-            error instanceof Error ? error.message : String(error);
-          output.appendLine(
-            `Failed to compile stylesheet file '${fileName}' (language: ${language}): ${message}`
-          );
-          htmlView.showErrorOverlay(
-            `Failed to compile '${fileName}' (${language}). Check the DevSwing output for details.`
-          );
+        } else if (isSwingDocumentOfType(document, SwingFileType.readme)) {
+          processReadme(document.getText(), false);
+          needsFullRebuild = needsFullRebuild || runOnEdit;
+        } else if (isSwingDocumentOfType(document, SwingFileType.config)) {
+          await htmlView.updateConfig(document.getText(), false);
+          needsFullRebuild = needsFullRebuild || runOnEdit;
+        } else if (document.uri.scheme === INPUT_SCHEME) {
+          htmlView.updateInput(document.getText(), false);
+          if (runOnEdit) {
+            incrementalUpdates.input = document.getText();
+          }
+        } else if (isSwingDocument(document.uri) && runOnEdit) {
+          needsFullRebuild = true;
         }
-      } else if (isSwingDocumentOfType(document, SwingFileType.readme)) {
-        const rawContent = document.getText();
-        processReadme(rawContent, runOnEdit);
-      } else if (isSwingDocumentOfType(document, SwingFileType.config)) {
-        htmlView.updateConfig(document.getText(), runOnEdit);
-      } else if (document.uri.scheme === INPUT_SCHEME) {
-        htmlView.updateInput(document.getText(), runOnEdit);
-      } else if (isSwingDocument(document.uri) && runOnEdit) {
-        htmlView.rebuildWebview();
       }
-    }, config.get("hotReloadDelay"))
+
+      if (runOnEdit) {
+        if (needsFullRebuild) {
+          await htmlView.rebuildWebview();
+        } else if (hasIncrementalUpdates(incrementalUpdates)) {
+          htmlView.applyUpdates(incrementalUpdates);
+        }
+      }
+    } finally {
+      isFlushingPendingDocuments = false;
+
+      if (pendingDocuments.size > 0) {
+        schedulePendingDocumentFlush(0);
+      }
+    }
+  }
+
+  const documentChangeDisposable = vscode.workspace.onDidChangeTextDocument(
+    ({ document }) => queueDocumentChange(document)
   );
 
   let documentSaveDisposable: vscode.Disposable;
@@ -696,7 +810,8 @@ export async function openSwing(uri: Uri) {
                 `Failed to add packages: ${error instanceof Error ? error.message : String(error)}`
               );
             }
-          }
+          },
+          { manifestUri }
         );
       }
     },
@@ -814,6 +929,10 @@ export async function openSwing(uri: Uri) {
     documentSaveDisposable?.dispose();
     missingPackagesDisposable.dispose();
 
+    if (pendingDocumentTimer) {
+      clearTimeout(pendingDocumentTimer);
+    }
+
     if (store.activeSwing?.hasTour) {
       endCurrentTour();
     }
@@ -852,6 +971,8 @@ export function registerPreviewModule(
   api: any,
   syncKeys: string[]
 ) {
+  initializeCdnJsCache(context.globalState);
+
   registerSwingCommands(context);
   registerTourCommands(context);
   registerCodePenCommands(context);
