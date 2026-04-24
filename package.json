@@ -544,7 +544,7 @@
   "devDependencies": {
     "@types/debounce": "^1.2.0",
     "@types/node": "^20.0.0",
-    "@types/sass": "^1.16.1",
+    "@types/sass": "^1.45.0",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
