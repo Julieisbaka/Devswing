@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { api } from "./api";
+import { registerLegacyCommandAliases } from "./compatibility";
 import { registerCreationModule } from "./creation";
 import { registerLiveShareModule } from "./liveShare";
 import { registerPreviewModule } from "./preview";
@@ -17,8 +18,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.globalState.setKeysForSync(syncKeys);
 
+  registerLegacyCommandAliases(context);
   registerTreeViewModule(context);
-  registerLiveShareModule();
+  registerLiveShareModule(context.extension.id);
 
   checkForSwingWorkspace();
 

@@ -1,5 +1,8 @@
 export const EXTENSION_NAME = "devswing";
-export const EXTENSION_ID = `JulieISBaka.${EXTENSION_NAME}`;
+export const LEGACY_COMMAND_PREFIX = "codeswing";
+export const LEGACY_LIVE_SHARE_EXTENSION_IDS = [
+	"codespaces-contrib.devswing",
+];
 
 export const INPUT_SCHEME = `${EXTENSION_NAME}-input`;
 
