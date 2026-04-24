@@ -155,7 +155,7 @@ If you'd like to add a link in your swing/readme, which references a file and/or
 
 ### GistPad
 
-Since swings are effectively runnable code snippets, they're great candidates for being saved as GitHub Gists. If you install the [GistPad](https://aka.ms/gistpad) extension, and sign in with your GitHub identity, then you can run the "GistPad: New DevSwing" (or "GistPad: New Secret DevSwing") command, in order to create a swing that is stored in a gist, as opposed to a local directory.
+Since swings are effectively runnable code snippets, they're great candidates for being saved as GitHub Gists. If you install the [GistPad](https://aka.ms/gistpad) extension, and sign in with your GitHub identity, then you can run the "GistPad: New codeSwing" (or "GistPad: New Secret codeSwing") command, in order to create a swing that is stored in a gist, as opposed to a local directory.
 
 The GistPad extension will recognize gists that are swings, and when you open them, the swing environment will be automatically launched. Furthermore, since GistPad lets you star gists and follow users, you can easily collaborate on swings, using gists as your developer-oriented cloud storage.
 
