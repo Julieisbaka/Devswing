@@ -608,7 +608,7 @@
     "sass.js": "^0.11.1",
     "squirrelly": "^9.1.0",
     "stream-browserify": "^3.0.0",
-    "svelte": "^4.1.2",
+    "svelte": "^5.55.5",
     "twing": "^7.2.1",
     "vsls": "^1.0.3015",
     "vue": "^3.4.0"
